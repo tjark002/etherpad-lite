@@ -1,190 +1,42 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="355px"
-   height="355px"
-   viewBox="0 0 355 355"
-   version="1.1"
-   id="svg49"
-   sodipodi:docname="brand.svg"
-   inkscape:version="1.0.2 (e86c870879, 2021-01-15)">
-  <metadata
-     id="metadata53">
-    <rdf:RDF>
-      <cc:Work
-         rdf:about="">
-        <dc:format>image/svg+xml</dc:format>
-        <dc:type
-           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-      </cc:Work>
-    </rdf:RDF>
-  </metadata>
-  <sodipodi:namedview
-     pagecolor="#ffffff"
-     bordercolor="#666666"
-     borderopacity="1"
-     objecttolerance="10"
-     gridtolerance="10"
-     guidetolerance="10"
-     inkscape:pageopacity="0"
-     inkscape:pageshadow="2"
-     inkscape:window-width="1920"
-     inkscape:window-height="1019"
-     id="namedview51"
-     showgrid="false"
-     inkscape:zoom="1.7690141"
-     inkscape:cx="216.8477"
-     inkscape:cy="177.5"
-     inkscape:window-x="0"
-     inkscape:window-y="32"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg49" />
-  <title
-     id="title2">Group 10</title>
-  <defs
-     id="defs28">
-    <!-- top line -->
-    <rect
-       id="path-4"
-       x="41"
-       y="110"
-       width="142"
-       height="25"
-       rx="12.5">
-      <animate
-         attributeName="width"
-         from="0"
-         to="142"
-         dur="3s"
-         fill="freeze" />
-    </rect>
-    <filter
-       x="-11.3%"
-       y="-32.0%"
-       width="122.5%"
-       height="228.0%"
-       filterUnits="objectBoundingBox"
-       id="filter-5">
-      <feOffset
-         dx="0"
-         dy="8"
-         in="SourceAlpha"
-         result="shadowOffsetOuter1"
-         id="feOffset5" />
-      <feGaussianBlur
-         stdDeviation="4"
-         in="shadowOffsetOuter1"
-         result="shadowBlurOuter1"
-         id="feGaussianBlur7" />
-      <feColorMatrix
-         values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.0568181818 0"
-         type="matrix"
-         in="shadowBlurOuter1"
-         id="feColorMatrix9" />
-    </filter>
-    <!-- middle line -->
-    <rect
-       id="path-2"
-       x="42"
-       y="167"
-       width="168"
-       height="27"
-       rx="13.5">
-      <animate
-         attributeName="width"
-         from="0"
-         to="168"
-         dur="5s"
-         fill="freeze" />
-    </rect>
-    <filter
-       x="-9.5%"
-       y="-29.6%"
-       width="119.0%"
-       height="218.5%"
-       filterUnits="objectBoundingBox"
-       id="filter-3">
-      <feOffset
-         dx="0"
-         dy="8"
-         in="SourceAlpha"
-         result="shadowOffsetOuter1"
-         id="feOffset13" />
-      <feGaussianBlur
-         stdDeviation="4"
-         in="shadowOffsetOuter1"
-         result="shadowBlurOuter1"
-         id="feGaussianBlur15" />
-      <feColorMatrix
-         values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.0568181818 0"
-         type="matrix"
-         in="shadowBlurOuter1"
-         id="feColorMatrix17" />
-    </filter>
-    <!-- bottom line -->
-    <rect
-       id="path-6"
-       x="41"
-       y="226"
-       width="105"
-       height="25"
-       rx="12.5">
-      <animate
-         attributeName="width"
-         from="0"
-         to="105"
-         dur="2s"
-         fill="freeze" />
-    </rect>
-    <filter
-       x="-15.2%"
-       y="-32.0%"
-       width="130.5%"
-       height="228.0%"
-       filterUnits="objectBoundingBox"
-       id="filter-7">
-      <feOffset
-         dx="0"
-         dy="8"
-         in="SourceAlpha"
-         result="shadowOffsetOuter1"
-         id="feOffset21" />
-      <feGaussianBlur
-         stdDeviation="4"
-         in="shadowOffsetOuter1"
-         result="shadowBlurOuter1"
-         id="feGaussianBlur23" />
-      <feColorMatrix
-         values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.0568181818 0"
-         type="matrix"
-         in="shadowBlurOuter1"
-         id="feColorMatrix25" />
-    </filter>
-  </defs>
-  <g
-     style="fill:#d4cece"
-     id="g1406"
-     transform="matrix(2.6750113,0,0,2.6750113,37.972698,37.225713)">
-    <g
-       id="g1391">
-      <path
-         d="m 96.076,39.194 -16.95,16.953 -0.484,0.216 -21.468,9.639 9.862,-21.949 4.26,-4.261 14.2,-14.199 c 0.398,0.368 0.797,0.747 1.188,1.134 l -14.19,14.183 5.882,-0.49 -2.451,6.217 -0.401,1.018 0.739,-0.292 6.492,-2.561 -0.488,5.882 12.973,-12.972 c 0.29,0.486 0.567,0.981 0.836,1.482 z m -15.603,13.285 0.43,-5.184 -4.012,1.581 -4.274,1.688 2.297,-5.832 0.973,-2.458 -2.426,0.201 -2.76,0.231 -2.293,2.292 -4.099,9.123 4.748,4.747 9.122,-4.098 0.229,-0.229 z"
-         id="path1383" />
-      <path
-         d="m 78.771,58.939 c 0,0.06 0,0.124 0,0.185 0,15.862 -12.862,28.725 -28.725,28.725 -15.866,0 -28.725,-12.862 -28.725,-28.725 V 59.06 L 47.44,70.79 34.805,42.665 30.352,38.211 c 2.49,-2.347 5.397,-4.251 8.609,-5.595 v 9.352 L 49.91,70.79 60.867,41.968 v -9.463 c 3.251,1.324 6.208,3.226 8.738,5.577 L 65.022,42.665 52.387,70.79 Z"
-         id="path1385" />
-      <path
-         d="M 58.466,12.392 V 41.529 L 49.91,64.02 41.365,41.529 V 12.435 c 0.538,-0.091 1.088,-0.174 1.641,-0.246 v 23.257 l 3.811,-4.506 3.094,7.129 3.101,-7.129 3.812,4.509 V 12.151 c 0.551,0.072 1.096,0.151 1.642,0.241 z m -1.644,28.835 v -3.244 l -3.362,-3.971 -3.55,8.171 -3.549,-8.171 -3.355,3.971 v 3.244 l 3.549,9.345 h 6.715 z"
-         id="path1387" />
-      <path
-         d="M 32.788,44.053 42.65,66.002 21.44,56.476 20.701,56.148 3.924,39.368 C 4.19,38.869 4.466,38.37 4.753,37.879 l 12.809,12.805 -0.492,-5.882 6.719,2.652 0.513,0.201 -0.276,-0.71 -2.577,-6.524 5.886,0.49 -14.059,-14.057 c 0.388,-0.382 0.782,-0.763 1.181,-1.138 l 14.215,14.215 z m 2.724,10.069 -4.091,-9.123 -2.293,-2.292 -2.513,-0.21 -2.67,-0.222 1.073,2.732 2.196,5.558 -4.048,-1.595 -4.242,-1.674 0.431,5.184 2.29,2.292 9.126,4.098 z"
-         id="path1389" />
+<!-- By Sam Herbert (@sherb), for everyone. More @ http://goo.gl/7AJzbL -->
+<svg width="45" height="45" viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg" stroke="#d4cece">
+    <g fill="none" fill-rule="evenodd" transform="translate(1 1)" stroke-width="2">
+        <circle cx="22" cy="22" r="6" stroke-opacity="0">
+            <animate attributeName="r"
+                 begin="1.5s" dur="3s"
+                 values="6;22"
+                 calcMode="linear"
+                 repeatCount="indefinite" />
+            <animate attributeName="stroke-opacity"
+                 begin="1.5s" dur="3s"
+                 values="1;0" calcMode="linear"
+                 repeatCount="indefinite" />
+            <animate attributeName="stroke-width"
+                 begin="1.5s" dur="3s"
+                 values="2;0" calcMode="linear"
+                 repeatCount="indefinite" />
+        </circle>
+        <circle cx="22" cy="22" r="6" stroke-opacity="0">
+            <animate attributeName="r"
+                 begin="3s" dur="3s"
+                 values="6;22"
+                 calcMode="linear"
+                 repeatCount="indefinite" />
+            <animate attributeName="stroke-opacity"
+                 begin="3s" dur="3s"
+                 values="1;0" calcMode="linear"
+                 repeatCount="indefinite" />
+            <animate attributeName="stroke-width"
+                 begin="3s" dur="3s"
+                 values="2;0" calcMode="linear"
+                 repeatCount="indefinite" />
+        </circle>
+        <circle cx="22" cy="22" r="8">
+            <animate attributeName="r"
+                 begin="0s" dur="1.5s"
+                 values="6;1;2;3;4;5;6"
+                 calcMode="linear"
+                 repeatCount="indefinite" />
+        </circle>
     </g>
-  </g>
 </svg>
