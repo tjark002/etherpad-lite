@@ -15,6 +15,7 @@ Etherpad is extremely flexible providing you the means to modify it to solve wha
 * [Video Chat](https://video.etherpad.com) - Plugins to enable Video and Audio chat in a pad.
 * [Collaboration++](https://collab.etherpad.com) - Plugins to improve the really-real time collaboration experience, suitable for busy pads.
 * [Document Analysis](https://analysis.etherpad.com) - Plugins to improve author and document analysis during and post creation.
+* [Scale](https://shard.etherpad.com) - Etherpad running at scale with pad sharding which allows Etherpad to scale to ∞ number of Active Pads with up to ~20,000 edits per second, per pad.
 
 # Project Status
 
@@ -31,7 +32,7 @@ Etherpad is extremely flexible providing you the means to modify it to solve wha
 # Installation
 
 ## Requirements
-- `nodejs` >= **10.17.0**.
+- [Node.js](https://nodejs.org/) >= **12.13.0**.
 
 ## GNU/Linux and other UNIX-like systems
 
@@ -45,7 +46,8 @@ src/bin/run.sh
 ```
 
 ### Manual install
-You'll need git and [node.js](https://nodejs.org) installed (minimum required Node version: **10.17.0**).
+
+You'll need Git and [Node.js](https://nodejs.org/) installed.
 
 **As any user (we recommend creating a separate user called etherpad):**
 

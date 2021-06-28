@@ -1,3 +1,64 @@
+# Next release
+
+### Compatibility changes
+
+* Node.js v12.13.0 or later is now required.
+* The `favicon` setting is now interpreted as a pathname to a favicon file, not
+  a URL. Please see the documentation comment in `settings.json.template`.
+* The undocumented `faviconPad` and `faviconTimeslider` settings have been
+  removed.
+* MySQL/MariaDB now uses connection pooling, which means you will see up to 10
+  connections to the MySQL/MariaDB server (by default) instead of 1. This might
+  cause Etherpad to crash with a "ER_CON_COUNT_ERROR: Too many connections"
+  error if your server is configured with a low connection limit.
+* Changes to environment variable substitution in `settings.json` (see the
+  documentation comments in `settings.json.template` for details):
+  * An environment variable set to the string "null" now becomes `null` instead
+    of the string "null". Similarly, if the environment variable is unset and
+    the default value is "null" (e.g., `"${UNSET_VAR:null}"`), the value now
+    becomes `null` instead of the string "null". It is no longer possible to
+    produce the string "null" via environment variable substitution.
+  * An environment variable set to the string "undefined" now causes the setting
+    to be removed instead of set to the string "undefined". Similarly, if the
+    environment variable is unset and the default value is "undefined" (e.g.,
+    `"${UNSET_VAR:undefined}"`), the setting is now removed instead of set to
+    the string "undefined". It is no longer possible to produce the string
+    "undefined" via environment variable substitution.
+  * Support for unset variables without a default value is now deprecated.
+    Please change all instances of `"${FOO}"` in your `settings.json` to
+    `${FOO:null}` to keep the current behavior.
+  * The `DB_*` variable substitutions in `settings.json.docker` that previously
+    defaulted to `null` now default to "undefined".
+
+### Notable enhancements
+
+* MySQL/MariaDB now uses connection pooling, which should improve stability and
+  reduce latency.
+* Bulk database writes are now retried individually on write failure.
+
+# 1.8.13
+
+### Notable fixes
+
+* Fixed a bug in the safeRun.sh script (#4935)
+* Add more endpoints that do not need authentication/authorization (#4921)
+* Fixed issue with non-opening device keyboard on smartphones (#4929)
+* Add version string to iframe_editor.css to prevent stale cache entry (#4964)
+
+### Notable enhancements
+
+* Refactor pad loading (no document.write anymore) (#4960)
+* Improve import/export functionality, logging and tests (#4957)
+* Refactor CSS manager creation (#4963)
+* Better metrics
+* Add test for client height (#4965)
+
+### Dependencies
+
+* ueberDB2 1.3.2 -> 1.4.4
+* express-rate-limit 5.2.5 -> 5.2.6
+* etherpad-require-kernel 1.0.9 -> 1.0.11
+
 # 1.8.12
 
 Special mention: Thanks to Sauce Labs for additional testing tunnels to help us grow! :)
