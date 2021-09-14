@@ -183,3 +183,6 @@ Visit the **[FAQ](https://github.com/ether/etherpad-lite/wiki/FAQ)**.
 
 # License
 [Apache License v2](http://www.apache.org/licenses/LICENSE-2.0.html)
+
+# Note
+kits logos and icons are not part of this licence.
