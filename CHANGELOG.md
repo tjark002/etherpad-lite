@@ -1,3 +1,42 @@
+# Next Release
+
+### Security fixes
+
+* Fixed leak of the writable pad ID when exporting from the pad's read-only ID.
+  This only matters if you treat the writeable pad IDs as secret (e.g., you are
+  not using [ep_padlist2](https://www.npmjs.com/package/ep_padlist2)) and you
+  share the pad's read-only ID with untrusted users. Instead of treating
+  writeable pad IDs as secret, you are encouraged to take advantage of
+  Etherpad's authentication and authorization mechanisms (e.g., use
+  [ep_openid_connect](https://www.npmjs.com/package/ep_openid_connect) with
+  [ep_readonly_guest](https://www.npmjs.com/package/ep_readonly_guest), or write
+  your own
+  [authentication](https://etherpad.org/doc/v1.8.14/#index_authenticate) and
+  [authorization](https://etherpad.org/doc/v1.8.14/#index_authorize) plugins).
+
+### Compatibility changes
+
+* For plugin authors:
+  * Etherpad now uses [jsdom](https://github.com/jsdom/jsdom) instead of
+    [cheerio](https://cheerio.js.org/) for processing HTML imports. There are
+    two consequences of this change:
+    * `require('ep_etherpad-lite/node_modules/cheerio')` no longer works. To
+      fix, your plugin should directly depend on `cheerio` and do
+      `require('cheerio')`.
+    * The `node` context argument passed to the `collectContentImage` hook is
+      now an
+      [`HTMLImageElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement)
+      object rather than a Cheerio Node-like object, so the API is slightly
+      different. See
+      [citizenos/ep_image_upload#49](https://github.com/citizenos/ep_image_upload/pull/49)
+      for an example fix.
+
+### Notable enhancements
+
+* For plugin authors:
+  * `clientVars` was added to the context for the `postAceInit` client-side
+    hook. Plugins should use this instead of the `clientVars` global variable.
+
 # 1.8.14
 
 ### Security fixes

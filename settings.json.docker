@@ -213,7 +213,9 @@
     "user":     "${DB_USER:undefined}",
     "password": "${DB_PASS:undefined}",
     "charset":  "${DB_CHARSET:undefined}",
-    "filename": "${DB_FILENAME:var/dirty.db}"
+    "filename": "${DB_FILENAME:var/dirty.db}",
+    "collection": "${DB_COLLECTION:undefined}",
+    "url":      "${DB_URL:undefined}"
   },
 
   /*
@@ -480,7 +482,7 @@
      * value to work properly, but increasing the value increases susceptibility
      * to denial of service attacks (malicious clients can exhaust memory).
      */
-    "maxHttpBufferSize": 10000
+    "maxHttpBufferSize": "${SOCKETIO_MAX_HTTP_BUFFER_SIZE:10000}"
   },
 
   /*
@@ -493,7 +495,7 @@
   /**
   * Disable dump of objects preventing a clean exit
   */
-  "dumpOnUncleanExit": false,
+  "dumpOnUncleanExit": "${DUMP_ON_UNCLEAN_EXIT:false}",
 
   /*
    * Disable indentation on new line when previous line ends with some special

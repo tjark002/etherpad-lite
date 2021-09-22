@@ -338,7 +338,7 @@ const handshake = () => {
 
       // If the Monospacefont value is set to true then change it to monospace.
       if (settings.useMonospaceFontGlobal === true) {
-        pad.changeViewOption('padFontFamily', 'monospace');
+        pad.changeViewOption('padFontFamily', 'RobotoMono');
       }
       // if the globalUserName value is set we need to tell the server and
       // the client about the new authorname
@@ -390,7 +390,6 @@ const pad = {
   getPadId: () => clientVars.padId,
   getClientIp: () => clientVars.clientIp,
   getColorPalette: () => clientVars.colorPalette,
-  getIsDebugEnabled: () => clientVars.debugEnabled,
   getPrivilege: (name) => clientVars.accountPrivs[name],
   getUserId: () => pad.myUserInfo.userId,
   getUserName: () => pad.myUserInfo.name,
@@ -502,7 +501,7 @@ const pad = {
 
       $('#editorcontainer').addClass('initialized');
 
-      hooks.aCallAll('postAceInit', {ace: padeditor.ace, pad});
+      hooks.aCallAll('postAceInit', {ace: padeditor.ace, clientVars, pad});
     };
 
     // order of inits is important here:
@@ -608,16 +607,6 @@ const pad = {
     } else if (msg.type === 'padoptions') {
       const opts = msg.options;
       pad.handleOptionsChange(opts);
-    }
-  },
-  dmesg: (m) => {
-    if (pad.getIsDebugEnabled()) {
-      const djs = $('#djs').get(0);
-      const wasAtBottom = (djs.scrollTop - (djs.scrollHeight - $(djs).height()) >= -20);
-      $('#djs').append(`<p>${m}</p>`);
-      if (wasAtBottom) {
-        djs.scrollTop = djs.scrollHeight;
-      }
     }
   },
   handleChannelStateChange: (newState, message) => {

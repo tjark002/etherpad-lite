@@ -8,6 +8,7 @@ const plugins = require('../../../static/js/pluginfw/plugin_defs');
 const readOnlyManager = require('../../../node/db/ReadOnlyManager');
 const setCookieParser = require('set-cookie-parser');
 const settings = require('../../../node/utils/Settings');
+const socketIoRouter = require('../../../node/handler/SocketIORouter');
 
 const logger = common.logger;
 
@@ -142,27 +143,23 @@ describe(__filename, function () {
 
   describe('Normal accesses', function () {
     it('!authn anonymous cookie /p/pad -> 200, ok', async function () {
-      this.timeout(600);
       const res = await agent.get('/p/pad').expect(200);
       socket = await connect(res);
       const clientVars = await handshake(socket, 'pad');
       assert.equal(clientVars.type, 'CLIENT_VARS');
     });
     it('!authn !cookie -> ok', async function () {
-      this.timeout(400);
       socket = await connect(null);
       const clientVars = await handshake(socket, 'pad');
       assert.equal(clientVars.type, 'CLIENT_VARS');
     });
     it('!authn user /p/pad -> 200, ok', async function () {
-      this.timeout(400);
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
       const clientVars = await handshake(socket, 'pad');
       assert.equal(clientVars.type, 'CLIENT_VARS');
     });
     it('authn user /p/pad -> 200, ok', async function () {
-      this.timeout(400);
       settings.requireAuthentication = true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -173,7 +170,6 @@ describe(__filename, function () {
     for (const authn of [false, true]) {
       const desc = authn ? 'authn user' : '!authn anonymous';
       it(`${desc} read-only /p/pad -> 200, ok`, async function () {
-        this.timeout(400);
         const get = (ep) => {
           let res = agent.get(ep);
           if (authn) res = res.auth('user', 'user-password');
@@ -197,7 +193,6 @@ describe(__filename, function () {
     }
 
     it('authz user /p/pad -> 200, ok', async function () {
-      this.timeout(400);
       settings.requireAuthentication = true;
       settings.requireAuthorization = true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -206,7 +201,6 @@ describe(__filename, function () {
       assert.equal(clientVars.type, 'CLIENT_VARS');
     });
     it('supports pad names with characters that must be percent-encoded', async function () {
-      this.timeout(400);
       settings.requireAuthentication = true;
       // requireAuthorization is set to true here to guarantee that the user's padAuthorizations
       // object is populated. Technically this isn't necessary because the user's padAuthorizations
@@ -223,7 +217,6 @@ describe(__filename, function () {
 
   describe('Abnormal access attempts', function () {
     it('authn anonymous /p/pad -> 401, error', async function () {
-      this.timeout(400);
       settings.requireAuthentication = true;
       const res = await agent.get('/p/pad').expect(401);
       // Despite the 401, try to create the pad via a socket.io connection anyway.
@@ -233,7 +226,6 @@ describe(__filename, function () {
     });
 
     it('authn anonymous read-only /p/pad -> 401, error', async function () {
-      this.timeout(400);
       settings.requireAuthentication = true;
       let res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -250,14 +242,12 @@ describe(__filename, function () {
     });
 
     it('authn !cookie -> error', async function () {
-      this.timeout(400);
       settings.requireAuthentication = true;
       socket = await connect(null);
       const message = await handshake(socket, 'pad');
       assert.equal(message.accessStatus, 'deny');
     });
     it('authorization bypass attempt -> error', async function () {
-      this.timeout(400);
       // Only allowed to access /p/pad.
       authorize = (req) => req.path === '/p/pad';
       settings.requireAuthentication = true;
@@ -278,7 +268,6 @@ describe(__filename, function () {
     });
 
     it("level='create' -> can create", async function () {
-      this.timeout(400);
       authorize = () => 'create';
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -287,7 +276,6 @@ describe(__filename, function () {
       assert.equal(clientVars.data.readonly, false);
     });
     it('level=true -> can create', async function () {
-      this.timeout(400);
       authorize = () => true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -296,7 +284,6 @@ describe(__filename, function () {
       assert.equal(clientVars.data.readonly, false);
     });
     it("level='modify' -> can modify", async function () {
-      this.timeout(400);
       await padManager.getPad('pad'); // Create the pad.
       authorize = () => 'modify';
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -306,7 +293,6 @@ describe(__filename, function () {
       assert.equal(clientVars.data.readonly, false);
     });
     it("level='create' settings.editOnly=true -> unable to create", async function () {
-      this.timeout(400);
       authorize = () => 'create';
       settings.editOnly = true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -315,7 +301,6 @@ describe(__filename, function () {
       assert.equal(message.accessStatus, 'deny');
     });
     it("level='modify' settings.editOnly=false -> unable to create", async function () {
-      this.timeout(400);
       authorize = () => 'modify';
       settings.editOnly = false;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -324,7 +309,6 @@ describe(__filename, function () {
       assert.equal(message.accessStatus, 'deny');
     });
     it("level='readOnly' -> unable to create", async function () {
-      this.timeout(400);
       authorize = () => 'readOnly';
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -332,7 +316,6 @@ describe(__filename, function () {
       assert.equal(message.accessStatus, 'deny');
     });
     it("level='readOnly' -> unable to modify", async function () {
-      this.timeout(400);
       await padManager.getPad('pad'); // Create the pad.
       authorize = () => 'readOnly';
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -349,7 +332,6 @@ describe(__filename, function () {
     });
 
     it('user.canCreate = true -> can create and modify', async function () {
-      this.timeout(400);
       settings.users.user.canCreate = true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -358,7 +340,6 @@ describe(__filename, function () {
       assert.equal(clientVars.data.readonly, false);
     });
     it('user.canCreate = false -> unable to create', async function () {
-      this.timeout(400);
       settings.users.user.canCreate = false;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -366,7 +347,6 @@ describe(__filename, function () {
       assert.equal(message.accessStatus, 'deny');
     });
     it('user.readOnly = true -> unable to create', async function () {
-      this.timeout(400);
       settings.users.user.readOnly = true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -374,7 +354,6 @@ describe(__filename, function () {
       assert.equal(message.accessStatus, 'deny');
     });
     it('user.readOnly = true -> unable to modify', async function () {
-      this.timeout(400);
       await padManager.getPad('pad'); // Create the pad.
       settings.users.user.readOnly = true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -384,7 +363,6 @@ describe(__filename, function () {
       assert.equal(clientVars.data.readonly, true);
     });
     it('user.readOnly = false -> can create and modify', async function () {
-      this.timeout(400);
       settings.users.user.readOnly = false;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
       socket = await connect(res);
@@ -393,7 +371,6 @@ describe(__filename, function () {
       assert.equal(clientVars.data.readonly, false);
     });
     it('user.readOnly = true, user.canCreate = true -> unable to create', async function () {
-      this.timeout(400);
       settings.users.user.canCreate = true;
       settings.users.user.readOnly = true;
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -410,7 +387,6 @@ describe(__filename, function () {
     });
 
     it('authorize hook does not elevate level from user settings', async function () {
-      this.timeout(400);
       settings.users.user.readOnly = true;
       authorize = () => 'create';
       const res = await agent.get('/p/pad').auth('user', 'user-password').expect(200);
@@ -419,7 +395,6 @@ describe(__filename, function () {
       assert.equal(message.accessStatus, 'deny');
     });
     it('user settings does not elevate level from authorize hook', async function () {
-      this.timeout(400);
       settings.users.user.readOnly = false;
       settings.users.user.canCreate = true;
       authorize = () => 'readOnly';
@@ -427,6 +402,113 @@ describe(__filename, function () {
       socket = await connect(res);
       const message = await handshake(socket, 'pad');
       assert.equal(message.accessStatus, 'deny');
+    });
+  });
+
+  describe('SocketIORouter.js', function () {
+    const Module = class {
+      setSocketIO(io) {}
+      handleConnect(socket) {}
+      handleDisconnect(socket) {}
+      handleMessage(socket, message) {}
+    };
+
+    afterEach(async function () {
+      socketIoRouter.deleteComponent(this.test.fullTitle());
+      socketIoRouter.deleteComponent(`${this.test.fullTitle()} #2`);
+    });
+
+    it('setSocketIO', async function () {
+      let ioServer;
+      socketIoRouter.addComponent(this.test.fullTitle(), new class extends Module {
+        setSocketIO(io) { ioServer = io; }
+      }());
+      assert(ioServer != null);
+    });
+
+    it('handleConnect', async function () {
+      let serverSocket;
+      socketIoRouter.addComponent(this.test.fullTitle(), new class extends Module {
+        handleConnect(socket) { serverSocket = socket; }
+      }());
+      socket = await connect();
+      assert(serverSocket != null);
+    });
+
+    it('handleDisconnect', async function () {
+      let resolveConnected;
+      const connected = new Promise((resolve) => resolveConnected = resolve);
+      let resolveDisconnected;
+      const disconnected = new Promise((resolve) => resolveDisconnected = resolve);
+      socketIoRouter.addComponent(this.test.fullTitle(), new class extends Module {
+        handleConnect(socket) {
+          this._socket = socket;
+          resolveConnected();
+        }
+        handleDisconnect(socket) {
+          assert(socket != null);
+          // There might be lingering disconnect events from sockets created by other tests.
+          if (this._socket == null || socket.id !== this._socket.id) return;
+          assert.equal(socket, this._socket);
+          resolveDisconnected();
+        }
+      }());
+      socket = await connect();
+      await connected;
+      socket.close();
+      socket = null;
+      await disconnected;
+    });
+
+    it('handleMessage (success)', async function () {
+      let serverSocket;
+      const want = {
+        component: this.test.fullTitle(),
+        protocolVersion: 2,
+        foo: {bar: 'asdf'},
+      };
+      let rx;
+      const got = new Promise((resolve) => { rx = resolve; });
+      socketIoRouter.addComponent(this.test.fullTitle(), new class extends Module {
+        handleConnect(socket) { serverSocket = socket; }
+        handleMessage(socket, message) { assert.equal(socket, serverSocket); rx(message); }
+      }());
+      socketIoRouter.addComponent(`${this.test.fullTitle()} #2`, new class extends Module {
+        handleMessage(socket, message) { assert.fail('wrong handler called'); }
+      }());
+      socket = await connect();
+      socket.send(want);
+      assert.deepEqual(await got, want);
+    });
+
+    const tx = async (socket, message = {}) => await new Promise((resolve, reject) => {
+      message = Object.assign({protocolVersion: 2}, message);
+      const AckErr = class extends Error {
+        constructor(name, ...args) { super(...args); this.name = name; }
+      };
+      socket.send(message,
+          (errj, val) => errj != null ? reject(new AckErr(errj.name, errj.message)) : resolve(val));
+    });
+
+    it('handleMessage with ack (success)', async function () {
+      const want = 'value';
+      socketIoRouter.addComponent(this.test.fullTitle(), new class extends Module {
+        handleMessage(socket, msg) { return want; }
+      }());
+      socket = await connect();
+      const got = await tx(socket, {component: this.test.fullTitle()});
+      assert.equal(got, want);
+    });
+
+    it('handleMessage with ack (error)', async function () {
+      const InjectedError = class extends Error {
+        constructor() { super('injected test error'); this.name = 'InjectedError'; }
+      };
+      socketIoRouter.addComponent(this.test.fullTitle(), new class extends Module {
+        handleMessage(socket, msg) { throw new InjectedError(); }
+      }());
+      socket = await connect();
+      await assert.rejects(tx(socket, {component: this.test.fullTitle()}), new InjectedError());
     });
   });
 });
