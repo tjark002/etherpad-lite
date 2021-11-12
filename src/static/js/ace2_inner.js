@@ -50,8 +50,6 @@ function Ace2Inner(editorInfo, cssManagers) {
   const FORMATTING_STYLES = ['bold', 'italic', 'underline', 'strikethrough'];
   const SELECT_BUTTON_CLASS = 'selected';
 
-  const caughtErrors = [];
-
   let thisAuthor = '';
 
   let disposed = false;
@@ -81,24 +79,45 @@ function Ace2Inner(editorInfo, cssManagers) {
   let outsideKeyPress = (e) => true;
   let outsideNotifyDirty = noop;
 
-  // Document representation.
+  /**
+   * Document representation.
+   */
   const rep = {
-    // Each entry in this skip list is an object created by createDomLineEntry(). The object
-    // represents a line (paragraph) of content.
+    /**
+     * The contents of the document. Each entry in this skip list is an object representing a
+     * line (actually paragraph) of text. The line objects are created by createDomLineEntry().
+     */
     lines: new SkipList(),
-    // Points at the start of the selection. Represented as [zeroBasedLineNumber,
-    // zeroBasedColumnNumber].
-    // TODO: If the selection starts at the beginning of a line, I think this could be either
-    // [lineNumber, 0] or [previousLineNumber, previousLineLength]. Need to confirm.
+    /**
+     * Start of the selection. Represented as an array of two non-negative numbers that point to the
+     * first character of the selection: [zeroBasedLineNumber, zeroBasedColumnNumber]. Notes:
+     *   - There is an implicit newline character (not actually stored) at the end of every line.
+     *     Because of this, a selection that starts at the end of a line (column number equals the
+     *     number of characters in the line, not including the implicit newline) is not equivalent
+     *     to a selection that starts at the beginning of the next line. The same goes for the
+     *     selection end.
+     *   - If there are N lines, [N, 0] is valid for the start of the selection. [N, 0] indicates
+     *     that the selection starts just after the implicit newline at the end of the document's
+     *     last line (if the document has any lines). The same goes for the end of the selection.
+     *   - If a line starts with a line marker, a selection that starts at the beginning of the line
+     *     may start either immediately before (column = 0) or immediately after (column = 1) the
+     *     line marker, and the two are considered to be semantically equivalent. For safety, all
+     *     code should be written to accept either but only produce selections that start after the
+     *     line marker (the column number should be 1, not 0, when there is a line marker). The same
+     *     goes for the end of the selection.
+     */
     selStart: null,
-    // Points at the character just past the last selected character. Same representation as
-    // selStart.
-    // TODO: If the last selected character is the last character of a line, I think this could be
-    // either [lineNumber, lineLength] or [lineNumber+1, 0]. Need to confirm.
+    /**
+     * End of the selection. Represented as an array of two non-negative numbers that point to the
+     * character just after the end of the selection: [zeroBasedLineNumber, zeroBasedColumnNumber].
+     * See the above notes for selStart.
+     */
     selEnd: null,
-    // Whether the selection extends "backwards", so that the focus point (controlled with the arrow
-    // keys) is at the beginning. This is not supported in IE, though native IE selections have that
-    // behavior (which we try not to interfere with). Must be false if selection is collapsed!
+    /**
+     * Whether the selection extends "backwards", so that the focus point (controlled with the arrow
+     * keys) is at the beginning. This is not supported in IE, though native IE selections have that
+     * behavior (which we try not to interfere with). Must be false if selection is collapsed!
+     */
     selFocusAtStart: false,
     alltext: '',
     alines: [],
@@ -354,13 +373,6 @@ function Ace2Inner(editorInfo, cssManagers) {
       });
 
       cleanExit = true;
-    } catch (e) {
-      caughtErrors.push(
-          {
-            error: e,
-            time: +new Date(),
-          });
-      throw e;
     } finally {
       const cs = currentCallStack;
       if (cleanExit) {
@@ -674,27 +686,8 @@ function Ace2Inner(editorInfo, cssManagers) {
   editorInfo.ace_setAuthorInfo = (author, info) => {
     setAuthorInfo(author, info);
   };
-  editorInfo.ace_setAuthorSelectionRange = (author, start, end) => {
-    changesetTracker.setAuthorSelectionRange(author, start, end);
-  };
-
-  editorInfo.ace_getUnhandledErrors = () => caughtErrors.slice();
 
   editorInfo.ace_getDocument = () => document;
-
-  editorInfo.ace_getDebugProperty = (prop) => {
-    if (prop === 'debugger') {
-      // obfuscate "eval" so as not to scare yuicompressor
-      window['ev' + 'al']('debugger');
-    } else if (prop === 'rep') {
-      return rep;
-    } else if (prop === 'window') {
-      return window;
-    } else if (prop === 'document') {
-      return document;
-    }
-    return undefined;
-  };
 
   const now = () => Date.now();
 
@@ -1429,7 +1422,6 @@ function Ace2Inner(editorInfo, cssManagers) {
     }
 
     const linesMutatee = {
-      // TODO: Rhansen to check usage of args here.
       splice: (start, numRemoved, ...args) => {
         domAndRepSplice(start, numRemoved, args.map((s) => s.slice(0, -1)));
       },
@@ -1455,27 +1447,25 @@ function Ace2Inner(editorInfo, cssManagers) {
       throw new Error(`doRepApplyChangeset length mismatch: ${errMsg}`);
     }
 
-    ((changes) => {
-      const editEvent = currentCallStack.editEvent;
-      if (editEvent.eventType === 'nonundoable') {
-        if (!editEvent.changeset) {
-          editEvent.changeset = changes;
-        } else {
-          editEvent.changeset = Changeset.compose(editEvent.changeset, changes, rep.apool);
-        }
+    const editEvent = currentCallStack.editEvent;
+    if (editEvent.eventType === 'nonundoable') {
+      if (!editEvent.changeset) {
+        editEvent.changeset = changes;
       } else {
-        const inverseChangeset = Changeset.inverse(changes, {
-          get: (i) => `${rep.lines.atIndex(i).text}\n`,
-          length: () => rep.lines.length(),
-        }, rep.alines, rep.apool);
-
-        if (!editEvent.backset) {
-          editEvent.backset = inverseChangeset;
-        } else {
-          editEvent.backset = Changeset.compose(inverseChangeset, editEvent.backset, rep.apool);
-        }
+        editEvent.changeset = Changeset.compose(editEvent.changeset, changes, rep.apool);
       }
-    })(changes);
+    } else {
+      const inverseChangeset = Changeset.inverse(changes, {
+        get: (i) => `${rep.lines.atIndex(i).text}\n`,
+        length: () => rep.lines.length(),
+      }, rep.alines, rep.apool);
+
+      if (!editEvent.backset) {
+        editEvent.backset = inverseChangeset;
+      } else {
+        editEvent.backset = Changeset.compose(inverseChangeset, editEvent.backset, rep.apool);
+      }
+    }
 
     Changeset.mutateAttributionLines(changes, rep.alines, rep.apool);
 

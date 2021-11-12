@@ -16,6 +16,7 @@
 
 ### Compatibility changes
 
+* The `logconfig` setting is deprecated.
 * For plugin authors:
   * Etherpad now uses [jsdom](https://github.com/jsdom/jsdom) instead of
     [cheerio](https://cheerio.js.org/) for processing HTML imports. There are
@@ -30,12 +31,39 @@
       different. See
       [citizenos/ep_image_upload#49](https://github.com/citizenos/ep_image_upload/pull/49)
       for an example fix.
+  * The `clientReady` server-side hook is deprecated; use the new `userJoin`
+    hook instead.
+  * The `userLeave` server-side hook's context properties have changed:
+    * `auth`: Deprecated.
+    * `author`: Deprecated; use the new `authorId` property instead.
+    * `readonly`: Deprecated; use the new `readOnly` property instead.
+    * `rev`: Deprecated.
+  * Changes to the `src/static/js/Changeset.js` library:
+    * `opIterator()`: The unused start index parameter has been removed, as has
+      the unused `lastIndex()` method on the returned object.
 
 ### Notable enhancements
 
+* Simplified pad reload after importing an `.etherpad` file.
 * For plugin authors:
   * `clientVars` was added to the context for the `postAceInit` client-side
     hook. Plugins should use this instead of the `clientVars` global variable.
+  * New `userJoin` server-side hook.
+  * The `userLeave` server-side hook has a new `socket` context property.
+  * The `helper.aNewPad()` function (accessible to client-side tests) now
+    accepts hook functions to inject when opening a pad. This can be used to
+    test any new client-side hooks your plugin provides.
+  * Chat improvements:
+    * The `chatNewMessage` client-side hook context has new properties:
+      * `message`: Provides access to the raw message object so that plugins can
+        see the original unprocessed message text and any added metadata.
+      * `rendered`: Allows plugins to completely override how the message is
+        rendered in the UI.
+    * New `chatSendMessage` client-side hook that enables plugins to process the
+      text before sending it to the server or augment the message object with
+      custom metadata.
+    * New `chatNewMessage` server-side hook to process new chat messages before
+      they are saved to the database and relayed to users.
 
 # 1.8.14
 
