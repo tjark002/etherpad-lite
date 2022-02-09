@@ -19,12 +19,14 @@
  * limitations under the License.
  */
 
+const AttributeMap = require('../../static/js/AttributeMap');
 const padManager = require('../db/PadManager');
 const Changeset = require('../../static/js/Changeset');
 const ChatMessage = require('../../static/js/ChatMessage');
 const AttributePool = require('../../static/js/AttributePool');
 const AttributeManager = require('../../static/js/AttributeManager');
 const authorManager = require('../db/AuthorManager');
+const {padutils} = require('../../static/js/pad_utils');
 const readOnlyManager = require('../db/ReadOnlyManager');
 const settings = require('../utils/Settings');
 const securityManager = require('../db/SecurityManager');
@@ -32,12 +34,9 @@ const plugins = require('../../static/js/pluginfw/plugin_defs.js');
 const log4js = require('log4js');
 const messageLogger = log4js.getLogger('message');
 const accessLogger = log4js.getLogger('access');
-const _ = require('underscore');
 const hooks = require('../../static/js/pluginfw/hooks.js');
-const channels = require('channels');
 const stats = require('../stats');
 const assert = require('assert').strict;
-const nodeify = require('nodeify');
 const {RateLimiterMemory} = require('rate-limiter-flexible');
 const webaccess = require('../hooks/express/webaccess');
 
@@ -85,11 +84,43 @@ stats.gauge('activePads', () => {
 });
 
 /**
+ * Processes one task at a time per channel.
+ */
+class Channels {
+  /**
+   * @param {(ch, task) => any} [exec] - Task executor. If omitted, tasks are assumed to be
+   *     functions that will be executed with the channel as the only argument.
+   */
+  constructor(exec = (ch, task) => task(ch)) {
+    this._exec = exec;
+    this._promiseChains = new Map();
+  }
+
+  /**
+   * Schedules a task for execution. The task will be executed once all previously enqueued tasks
+   * for the named channel have completed.
+   *
+   * @param {any} ch - Identifies the channel.
+   * @param {any} task - The task to give to the executor.
+   * @returns {Promise<any>} The value returned by the executor.
+   */
+  async enqueue(ch, task) {
+    const p = (this._promiseChains.get(ch) || Promise.resolve()).then(() => this._exec(ch, task));
+    const pc = p
+        .catch(() => {}) // Prevent rejections from halting the queue.
+        .then(() => {
+          // Clean up this._promiseChains if there are no more tasks for the channel.
+          if (this._promiseChains.get(ch) === pc) this._promiseChains.delete(ch);
+        });
+    this._promiseChains.set(ch, pc);
+    return await p;
+  }
+}
+
+/**
  * A changeset queue per pad that is processed by handleUserChanges()
  */
-const padChannels = new channels.channels(
-    ({socket, message}, callback) => nodeify(handleUserChanges(socket, message), callback)
-);
+const padChannels = new Channels((ch, {socket, message}) => handleUserChanges(socket, message));
 
 /**
  * This Method is called by server.js to tell the message handler on which socket it should send
@@ -172,8 +203,8 @@ exports.handleMessage = async (socket, message) => {
     try {
       await rateLimiter.consume(socket.request.ip); // consume 1 point per event from IP
     } catch (e) {
-      console.warn(`Rate limited: ${socket.request.ip} to reduce the amount of rate limiting ` +
-                   'that happens edit the rateLimit values in settings.json');
+      messageLogger.warn(`Rate limited IP ${socket.request.ip}. To reduce the amount of rate ` +
+                         'limiting that happens edit the rateLimit values in settings.json');
       stats.meter('rateLimited').mark();
       socket.json.send({disconnect: 'rateLimited'});
       return;
@@ -204,6 +235,11 @@ exports.handleMessage = async (socket, message) => {
       padID: message.padId,
       token: message.token,
     };
+    const padIds = await readOnlyManager.getIds(thisSession.auth.padID);
+    thisSession.padId = padIds.padId;
+    thisSession.readOnlyPadId = padIds.readOnlyPadId;
+    thisSession.readonly =
+        padIds.readonly || !webaccess.userCanModify(thisSession.auth.padID, socket.client.request);
   }
 
   const auth = thisSession.auth;
@@ -240,9 +276,37 @@ exports.handleMessage = async (socket, message) => {
   thisSession.author = authorID;
 
   // Allow plugins to bypass the readonly message blocker
-  const context = {message, socket, client: socket}; // `client` for backwards compatibility.
-  if ((await hooks.aCallAll('handleMessageSecurity', context)).some((w) => w === true)) {
-    thisSession.readonly = false;
+  let readOnly = thisSession.readonly;
+  const context = {
+    message,
+    sessionInfo: {
+      authorId: thisSession.author,
+      padId: thisSession.padId,
+      readOnly: thisSession.readonly,
+    },
+    socket,
+    get client() {
+      padutils.warnDeprecated(
+          'the `client` context property for the handleMessageSecurity and handleMessage hooks ' +
+          'is deprecated; use the `socket` property instead');
+      return this.socket;
+    },
+  };
+  for (const res of await hooks.aCallAll('handleMessageSecurity', context)) {
+    switch (res) {
+      case true:
+        padutils.warnDeprecated(
+            'returning `true` from a `handleMessageSecurity` hook function is deprecated; ' +
+            'return "permitOnce" instead');
+        thisSession.readonly = false;
+        // Fall through:
+      case 'permitOnce':
+        readOnly = false;
+        break;
+      default:
+        messageLogger.warn(
+            'Ignoring unsupported return value from handleMessageSecurity hook function:', res);
+    }
   }
 
   // Call handleMessage hook. If a plugin returns null, the message will be dropped.
@@ -262,11 +326,11 @@ exports.handleMessage = async (socket, message) => {
   } else if (message.type === 'CHANGESET_REQ') {
     await handleChangesetRequest(socket, message);
   } else if (message.type === 'COLLABROOM') {
-    if (thisSession.readonly) {
+    if (readOnly) {
       messageLogger.warn('Dropped message, COLLABROOM for readonly pad');
     } else if (message.data.type === 'USER_CHANGES') {
       stats.counter('pendingEdits').inc();
-      padChannels.emit(message.padId, {socket, message}); // add to pad queue
+      await padChannels.enqueue(message.padId, {socket, message});
     } else if (message.data.type === 'USERINFO_UPDATE') {
       await handleUserInfoUpdate(socket, message);
     } else if (message.data.type === 'CHAT_MESSAGE') {
@@ -530,22 +594,6 @@ const handleUserChanges = async (socket, message) => {
   // This one's no longer pending, as we're gonna process it now
   stats.counter('pendingEdits').dec();
 
-  // Make sure all required fields are present
-  if (message.data.baseRev == null) {
-    messageLogger.warn('Dropped message, USER_CHANGES Message has no baseRev!');
-    return;
-  }
-
-  if (message.data.apool == null) {
-    messageLogger.warn('Dropped message, USER_CHANGES Message has no apool!');
-    return;
-  }
-
-  if (message.data.changeset == null) {
-    messageLogger.warn('Dropped message, USER_CHANGES Message has no changeset!');
-    return;
-  }
-
   // The client might disconnect between our callbacks. We should still
   // finish processing the changeset, so keep a reference to the session.
   const thisSession = sessioninfos[socket.id];
@@ -554,75 +602,46 @@ const handleUserChanges = async (socket, message) => {
   // and always use the copy. atm a message will be ignored if the session is gone even
   // if the session was valid when the message arrived in the first place
   if (!thisSession) {
-    messageLogger.warn('Dropped message, disconnect happened in the mean time');
+    messageLogger.warn('Ignoring USER_CHANGES from disconnected user');
     return;
   }
 
-  // get all Vars we need
-  const baseRev = message.data.baseRev;
-  const wireApool = (new AttributePool()).fromJsonable(message.data.apool);
-  let changeset = message.data.changeset;
-
   // Measure time to process edit
   const stopWatch = stats.timer('edits').start();
-
-  // get the pad
-  const pad = await padManager.getPad(thisSession.padId);
-
-  // create the changeset
   try {
-    try {
-      // Verify that the changeset has valid syntax and is in canonical form
-      Changeset.checkRep(changeset);
+    const {data: {baseRev, apool, changeset}} = message;
+    if (baseRev == null) throw new Error('missing baseRev');
+    if (apool == null) throw new Error('missing apool');
+    if (changeset == null) throw new Error('missing changeset');
+    const wireApool = (new AttributePool()).fromJsonable(apool);
+    const pad = await padManager.getPad(thisSession.padId);
 
-      // Verify that the attribute indexes used in the changeset are all
-      // defined in the accompanying attribute pool.
-      Changeset.eachAttribNumber(changeset, (n) => {
-        if (!wireApool.getAttrib(n)) {
-          throw new Error(`Attribute pool is missing attribute ${n} for changeset ${changeset}`);
-        }
-      });
+    // Verify that the changeset has valid syntax and is in canonical form
+    Changeset.checkRep(changeset);
 
-      // Validate all added 'author' attribs to be the same value as the current user
-      const iterator = Changeset.opIterator(Changeset.unpack(changeset).ops);
-      let op;
+    // Validate all added 'author' attribs to be the same value as the current user
+    for (const op of Changeset.deserializeOps(Changeset.unpack(changeset).ops)) {
+      // + can add text with attribs
+      // = can change or add attribs
+      // - can have attribs, but they are discarded and don't show up in the attribs -
+      // but do show up in the pool
 
-      while (iterator.hasNext()) {
-        op = iterator.next();
-
-        // + can add text with attribs
-        // = can change or add attribs
-        // - can have attribs, but they are discarded and don't show up in the attribs -
-        // but do show up in the  pool
-
-        op.attribs.split('*').forEach((attr) => {
-          if (!attr) return;
-
-          attr = wireApool.getAttrib(attr);
-          if (!attr) return;
-
-          // the empty author is used in the clearAuthorship functionality so this
-          // should be the only exception
-          if ('author' === attr[0] && (attr[1] !== thisSession.author && attr[1] !== '')) {
-            throw new Error(`Author ${thisSession.author} tried to submit changes as author ` +
-                            `${attr[1]} in changeset ${changeset}`);
-          }
-        });
+      // Besides verifying the author attribute, this serves a second purpose:
+      // AttributeMap.fromString() ensures that all attribute numbers are valid (it will throw if
+      // an attribute number isn't in the pool).
+      const opAuthorId = AttributeMap.fromString(op.attribs, wireApool).get('author');
+      if (opAuthorId && opAuthorId !== thisSession.author) {
+        throw new Error(`Author ${thisSession.author} tried to submit changes as author ` +
+                        `${opAuthorId} in changeset ${changeset}`);
       }
-
-      // ex. adoptChangesetAttribs
-
-      // Afaik, it copies the new attributes from the changeset, to the global Attribute Pool
-      changeset = Changeset.moveOpsToNewPool(changeset, wireApool, pad.pool);
-    } catch (e) {
-      // There is an error in this changeset, so just refuse it
-      socket.json.send({disconnect: 'badChangeset'});
-      stats.meter('failedChangesets').mark();
-      throw new Error(`Can't apply USER_CHANGES from Socket ${socket.id} because: ${e.message}`);
     }
 
+    // ex. adoptChangesetAttribs
+
+    // Afaik, it copies the new attributes from the changeset, to the global Attribute Pool
+    let rebasedChangeset = Changeset.moveOpsToNewPool(changeset, wireApool, pad.pool);
+
     // ex. applyUserChanges
-    const apool = pad.pool;
     let r = baseRev;
 
     // The client's changeset might not be based on the latest revision,
@@ -630,48 +649,30 @@ const handleUserChanges = async (socket, message) => {
     // Update the changeset so that it can be applied to the latest revision.
     while (r < pad.getHeadRevisionNumber()) {
       r++;
-
-      const c = await pad.getRevisionChangeset(r);
-
+      const {changeset: c, meta: {author: authorId}} = await pad.getRevision(r);
+      if (changeset === c && thisSession.author === authorId) {
+        // Assume this is a retransmission of an already applied changeset.
+        rebasedChangeset = Changeset.identity(Changeset.unpack(changeset).oldLen);
+      }
       // At this point, both "c" (from the pad) and "changeset" (from the
       // client) are relative to revision r - 1. The follow function
       // rebases "changeset" so that it is relative to revision r
       // and can be applied after "c".
-
-      try {
-        // a changeset can be based on an old revision with the same changes in it
-        // prevent eplite from accepting it TODO: better send the client a NEW_CHANGES
-        // of that revision
-        if (baseRev + 1 === r && c === changeset) {
-          socket.json.send({disconnect: 'badChangeset'});
-          stats.meter('failedChangesets').mark();
-          throw new Error("Won't apply USER_CHANGES, as it contains an already accepted changeset");
-        }
-
-        changeset = Changeset.follow(c, changeset, false, apool);
-      } catch (e) {
-        socket.json.send({disconnect: 'badChangeset'});
-        stats.meter('failedChangesets').mark();
-        throw new Error(`Can't apply USER_CHANGES, because ${e.message}`);
-      }
+      rebasedChangeset = Changeset.follow(c, rebasedChangeset, false, pad.pool);
     }
 
     const prevText = pad.text();
 
-    if (Changeset.oldLen(changeset) !== prevText.length) {
-      socket.json.send({disconnect: 'badChangeset'});
-      stats.meter('failedChangesets').mark();
-      throw new Error(`Can't apply USER_CHANGES ${changeset} with oldLen ` +
-                      `${Changeset.oldLen(changeset)} to document of length ${prevText.length}`);
+    if (Changeset.oldLen(rebasedChangeset) !== prevText.length) {
+      throw new Error(
+          `Can't apply changeset ${rebasedChangeset} with oldLen ` +
+          `${Changeset.oldLen(rebasedChangeset)} to document of length ${prevText.length}`);
     }
 
-    try {
-      await pad.appendRevision(changeset, thisSession.author);
-    } catch (e) {
-      socket.json.send({disconnect: 'badChangeset'});
-      stats.meter('failedChangesets').mark();
-      throw e;
-    }
+    const newRev = await pad.appendRevision(rebasedChangeset, thisSession.author);
+    // The head revision will either stay the same or increase by 1 depending on whether the
+    // changeset has a net effect.
+    assert([r, r + 1].includes(newRev));
 
     const correctionChangeset = _correctMarkersInPad(pad.atext, pad.pool);
     if (correctionChangeset) {
@@ -684,12 +685,21 @@ const handleUserChanges = async (socket, message) => {
       await pad.appendRevision(nlChangeset);
     }
 
+    // The client assumes that ACCEPT_COMMIT and NEW_CHANGES messages arrive in order. Make sure we
+    // have already sent any previous ACCEPT_COMMIT and NEW_CHANGES messages.
+    assert.equal(thisSession.rev, r);
+    socket.json.send({type: 'COLLABROOM', data: {type: 'ACCEPT_COMMIT', newRev}});
+    thisSession.rev = newRev;
+    if (newRev !== r) thisSession.time = await pad.getRevisionDate(newRev);
     await exports.updatePadClients(pad);
   } catch (err) {
-    console.warn(err.stack || err);
+    socket.json.send({disconnect: 'badChangeset'});
+    stats.meter('failedChangesets').mark();
+    messageLogger.warn(`Failed to apply USER_CHANGES from author ${thisSession.author} ` +
+                       `(socket ${socket.id}) on pad ${thisSession.padId}: ${err.stack || err}`);
+  } finally {
+    stopWatch.end();
   }
-
-  stopWatch.end();
 };
 
 exports.updatePadClients = async (pad) => {
@@ -726,24 +736,19 @@ exports.updatePadClients = async (pad) => {
       const revChangeset = revision.changeset;
       const currentTime = revision.meta.timestamp;
 
-      let msg;
-      if (author === sessioninfo.author) {
-        msg = {type: 'COLLABROOM', data: {type: 'ACCEPT_COMMIT', newRev: r}};
-      } else {
-        const forWire = Changeset.prepareForWire(revChangeset, pad.pool);
-        msg = {
-          type: 'COLLABROOM',
-          data: {
-            type: 'NEW_CHANGES',
-            newRev: r,
-            changeset: forWire.translated,
-            apool: forWire.pool,
-            author,
-            currentTime,
-            timeDelta: currentTime - sessioninfo.time,
-          },
-        };
-      }
+      const forWire = Changeset.prepareForWire(revChangeset, pad.pool);
+      const msg = {
+        type: 'COLLABROOM',
+        data: {
+          type: 'NEW_CHANGES',
+          newRev: r,
+          changeset: forWire.translated,
+          apool: forWire.pool,
+          author,
+          currentTime,
+          timeDelta: currentTime - sessioninfo.time,
+        },
+      };
       try {
         socket.json.send(msg);
       } catch (err) {
@@ -765,15 +770,10 @@ const _correctMarkersInPad = (atext, apool) => {
   // collect char positions of line markers (e.g. bullets) in new atext
   // that aren't at the start of a line
   const badMarkers = [];
-  const iter = Changeset.opIterator(atext.attribs);
   let offset = 0;
-  while (iter.hasNext()) {
-    const op = iter.next();
-
-    const hasMarker = _.find(
-        AttributeManager.lineAttributes,
-        (attribute) => Changeset.opAttributeValue(op, attribute, apool)) !== undefined;
-
+  for (const op of Changeset.deserializeOps(atext.attribs)) {
+    const attribs = AttributeMap.fromString(op.attribs, apool);
+    const hasMarker = AttributeManager.lineAttributes.some((a) => attribs.has(a));
     if (hasMarker) {
       for (let i = 0; i < op.chars; i++) {
         if (offset > 0 && text.charAt(offset - 1) !== '\n') {
@@ -816,12 +816,6 @@ const handleClientReady = async (socket, message) => {
   // Check if the user has already disconnected.
   if (sessionInfo == null) return;
   assert(sessionInfo.author);
-
-  const padIds = await readOnlyManager.getIds(sessionInfo.auth.padID);
-  sessionInfo.padId = padIds.padId;
-  sessionInfo.readOnlyPadId = padIds.readOnlyPadId;
-  sessionInfo.readonly =
-      padIds.readonly || !webaccess.userCanModify(sessionInfo.auth.padID, socket.client.request);
 
   await hooks.aCallAll('clientReady', message); // Deprecated due to awkward context.
 
@@ -961,7 +955,7 @@ const handleClientReady = async (socket, message) => {
       apool = attribsForWire.pool.toJsonable();
       atext.attribs = attribsForWire.translated;
     } catch (e) {
-      console.error(e.stack || e);
+      messageLogger.error(e.stack || e);
       socket.json.send({disconnect: 'corruptPad'}); // pull the brakes
 
       return;
@@ -1004,6 +998,7 @@ const handleClientReady = async (socket, message) => {
       readOnlyId: sessionInfo.readOnlyPadId,
       readonly: sessionInfo.readonly,
       serverTimestamp: Date.now(),
+      sessionRefreshInterval: settings.cookie.sessionRefreshInterval,
       userId: sessionInfo.author,
       abiwordAvailable: settings.abiwordAvailable(),
       sofficeAvailable: settings.sofficeAvailable(),
@@ -1164,8 +1159,8 @@ const handleChangesetRequest = async (socket, message) => {
     data.requestID = message.data.requestID;
     socket.json.send({type: 'CHANGESET_REQ', data});
   } catch (err) {
-    console.error(`Error while handling a changeset request for ${padIds.padId}`,
-        err.toString(), message.data);
+    messageLogger.error(`Error while handling a changeset request ${message.data} ` +
+                        `for ${padIds.padId}: ${err.stack || err}`);
   }
 };
 
@@ -1308,7 +1303,8 @@ const composePadChangesets = async (padId, startNum, endNum) => {
     return changeset;
   } catch (e) {
     // r-1 indicates the rev that was build starting with startNum, applying startNum+1, +2, +3
-    console.warn('failed to compose cs in pad:', padId, ' startrev:', startNum, ' current rev:', r);
+    messageLogger.warn(
+        `failed to compose cs in pad: ${padId} startrev: ${startNum} current rev: ${r}`);
     throw e;
   }
 };

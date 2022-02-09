@@ -92,6 +92,17 @@ class AttributePool {
   }
 
   /**
+   * @returns {AttributePool} A deep copy of this attribute pool.
+   */
+  clone() {
+    const c = new AttributePool();
+    for (const [n, a] of Object.entries(this.numToAttrib)) c.numToAttrib[n] = [a[0], a[1]];
+    Object.assign(c.attribToNum, this.attribToNum);
+    c.nextNum = this.nextNum;
+    return c;
+  }
+
+  /**
    * Add an attribute to the attribute set, or query for an existing attribute identifier.
    *
    * @param {Attribute} attrib - The attribute's `[key, value]` pair of strings.
@@ -164,7 +175,10 @@ class AttributePool {
 
   /**
    * @returns {Jsonable} An object that can be passed to `fromJsonable` to reconstruct this
-   * attribute pool. The returned object can be converted to JSON.
+   *     attribute pool. The returned object can be converted to JSON. WARNING: The returned object
+   *     has references to internal state (it is not a deep copy). Use the `clone()` method to copy
+   *     a pool -- do NOT do `new AttributePool().fromJsonable(pool.toJsonable())` to copy because
+   *     the resulting shared state will lead to pool corruption.
    */
   toJsonable() {
     return {
@@ -177,7 +191,10 @@ class AttributePool {
    * Replace the contents of this attribute pool with values from a previous call to `toJsonable`.
    *
    * @param {Jsonable} obj - Object returned by `toJsonable` containing the attributes and their
-   *     identifiers.
+   *     identifiers. WARNING: This function takes ownership of the object (it does not make a deep
+   *     copy). Use the `clone()` method to copy a pool -- do NOT do
+   *     `new AttributePool().fromJsonable(pool.toJsonable())` to copy because the resulting shared
+   *     state will lead to pool corruption.
    */
   fromJsonable(obj) {
     this.numToAttrib = obj.numToAttrib;
@@ -187,6 +204,35 @@ class AttributePool {
       this.attribToNum[String(this.numToAttrib[n])] = Number(n);
     }
     return this;
+  }
+
+  /**
+   * Asserts that the data in the pool is consistent. Throws if inconsistent.
+   */
+  check() {
+    if (!Number.isInteger(this.nextNum)) throw new Error('nextNum property is not an integer');
+    if (this.nextNum < 0) throw new Error('nextNum property is negative');
+    for (const prop of ['numToAttrib', 'attribToNum']) {
+      const obj = this[prop];
+      if (obj == null) throw new Error(`${prop} property is null`);
+      if (typeof obj !== 'object') throw new TypeError(`${prop} property is not an object`);
+      const keys = Object.keys(obj);
+      if (keys.length !== this.nextNum) {
+        throw new Error(`${prop} size mismatch (want ${this.nextNum}, got ${keys.length})`);
+      }
+    }
+    for (let i = 0; i < this.nextNum; ++i) {
+      const attr = this.numToAttrib[`${i}`];
+      if (!Array.isArray(attr)) throw new TypeError(`attrib ${i} is not an array`);
+      if (attr.length !== 2) throw new Error(`attrib ${i} is not an array of length 2`);
+      const [k, v] = attr;
+      if (k == null) throw new TypeError(`attrib ${i} key is null`);
+      if (typeof k !== 'string') throw new TypeError(`attrib ${i} key is not a string`);
+      if (v == null) throw new TypeError(`attrib ${i} value is null`);
+      if (typeof v !== 'string') throw new TypeError(`attrib ${i} value is not a string`);
+      const attrStr = String(attr);
+      if (this.attribToNum[attrStr] !== i) throw new Error(`attribToNum for ${attrStr} !== ${i}`);
+    }
   }
 }
 

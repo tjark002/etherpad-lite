@@ -25,6 +25,13 @@ const apiVersion = 1;
 const testPadId = makeid();
 const testPadIdEnc = encodeURIComponent(testPadId);
 
+const deleteTestPad = async () => {
+  if (await padManager.doesPadExist(testPadId)) {
+    const pad = await padManager.getPad(testPadId);
+    await pad.remove();
+  }
+};
+
 describe(__filename, function () {
   this.timeout(45000);
   before(async function () { agent = await common.init(); });
@@ -315,15 +322,121 @@ describe(__filename, function () {
           });
     });
 
+    describe('malformed .etherpad files are rejected', function () {
+      const makeGoodExport = () => ({
+        'pad:testing': {
+          atext: {
+            text: 'foo\n',
+            attribs: '|1+4',
+          },
+          pool: {
+            numToAttrib: {
+              0: ['author', 'a.foo'],
+            },
+            nextNum: 1,
+          },
+          head: 0,
+          savedRevisions: [],
+        },
+        'globalAuthor:a.foo': {
+          colorId: '#000000',
+          name: 'author foo',
+          timestamp: 1598747784631,
+          padIDs: 'testing',
+        },
+        'pad:testing:revs:0': {
+          changeset: 'Z:1>3+3$foo',
+          meta: {
+            author: 'a.foo',
+            timestamp: 1597632398288,
+            pool: {
+              numToAttrib: {},
+              nextNum: 0,
+            },
+            atext: {
+              text: 'foo\n',
+              attribs: '|1+4',
+            },
+          },
+        },
+      });
+
+      const importEtherpad = (records) => agent.post(`/p/${testPadId}/import`)
+          .attach('file', Buffer.from(JSON.stringify(records), 'utf8'), {
+            filename: '/test.etherpad',
+            contentType: 'application/etherpad',
+          });
+
+      before(async function () {
+        // makeGoodExport() is assumed to produce good .etherpad records. Verify that assumption so
+        // that a buggy makeGoodExport() doesn't cause checks to accidentally pass.
+        const records = makeGoodExport();
+        await deleteTestPad();
+        await importEtherpad(records)
+            .expect(200)
+            .expect('Content-Type', /json/)
+            .expect((res) => assert.deepEqual(res.body, {
+              code: 0,
+              message: 'ok',
+              data: {directDatabaseAccess: true},
+            }));
+        await agent.get(`/p/${testPadId}/export/txt`)
+            .expect(200)
+            .buffer(true).parse(superagent.parse.text)
+            .expect((res) => assert.match(res.text, /foo/));
+      });
+
+      it('missing rev', async function () {
+        const records = makeGoodExport();
+        delete records['pad:testing:revs:0'];
+        await importEtherpad(records).expect(500);
+      });
+
+      it('bad changeset', async function () {
+        const records = makeGoodExport();
+        records['pad:testing:revs:0'].changeset = 'garbage';
+        await importEtherpad(records).expect(500);
+      });
+
+      it('missing attrib in pool', async function () {
+        const records = makeGoodExport();
+        records['pad:testing'].pool.nextNum++;
+        await importEtherpad(records).expect(500);
+      });
+
+      it('extra attrib in pool', async function () {
+        const records = makeGoodExport();
+        const pool = records['pad:testing'].pool;
+        pool.numToAttrib[pool.nextNum] = ['key', 'value'];
+        await importEtherpad(records).expect(500);
+      });
+
+      it('changeset refers to non-existent attrib', async function () {
+        const records = makeGoodExport();
+        records['pad:testing:revs:1'] = {
+          changeset: 'Z:4>4*1+4$asdf',
+          meta: {
+            author: 'a.foo',
+            timestamp: 1597632398288,
+          },
+        };
+        records['pad:testing'].head = 1;
+        records['pad:testing'].atext = {
+          text: 'asdffoo\n',
+          attribs: '*1+4|1+4',
+        };
+        await importEtherpad(records).expect(500);
+      });
+
+      it('pad atext does not match', async function () {
+        const records = makeGoodExport();
+        records['pad:testing'].atext.attribs = `*0${records['pad:testing'].atext.attribs}`;
+        await importEtherpad(records).expect(500);
+      });
+    });
+
     describe('Import authorization checks', function () {
       let authorize;
-
-      const deleteTestPad = async () => {
-        if (await padManager.doesPadExist(testPadId)) {
-          const pad = await padManager.getPad(testPadId);
-          await pad.remove();
-        }
-      };
 
       const createTestPad = async (text) => {
         const pad = await padManager.getPad(testPadId);

@@ -139,11 +139,11 @@ exports.getRevisionChangeset = async (padID, rev) => {
     }
 
     // get the changeset for this revision
-    return pad.getRevisionChangeset(rev);
+    return await pad.getRevisionChangeset(rev);
   }
 
   // the client wants the latest changeset, lets return it to him
-  return pad.getRevisionChangeset(head);
+  return await pad.getRevisionChangeset(head);
 };
 
 /**
@@ -172,7 +172,9 @@ exports.getText = async (padID, rev) => {
     }
 
     // get the text of this revision
-    const text = await pad.getInternalRevisionAText(rev);
+    // getInternalRevisionAText() returns an atext object but we only want the .text inside it.
+    // Details at https://github.com/ether/etherpad-lite/issues/5073
+    const {text} = await pad.getInternalRevisionAText(rev);
     return {text};
   }
 
@@ -199,10 +201,8 @@ exports.setText = async (padID, text) => {
   // get the pad
   const pad = await getPadSafe(padID, true);
 
-  await Promise.all([
-    pad.setText(text),
-    padMessageHandler.updatePadClients(pad),
-  ]);
+  await pad.setText(text);
+  await padMessageHandler.updatePadClients(pad);
 };
 
 /**
@@ -221,10 +221,8 @@ exports.appendText = async (padID, text) => {
   }
 
   const pad = await getPadSafe(padID, true);
-  await Promise.all([
-    pad.appendText(text),
-    padMessageHandler.updatePadClients(pad),
-  ]);
+  await pad.appendText(text);
+  await padMessageHandler.updatePadClients(pad);
 };
 
 /**
@@ -527,12 +525,10 @@ exports.restoreRevision = async (padID, rev) => {
   atext.text += '\n';
 
   const eachAttribRun = (attribs, func) => {
-    const attribsIter = Changeset.opIterator(attribs);
     let textIndex = 0;
     const newTextStart = 0;
     const newTextEnd = atext.text.length;
-    while (attribsIter.hasNext()) {
-      const op = attribsIter.next();
+    for (const op of Changeset.deserializeOps(attribs)) {
       const nextIndex = textIndex + op.chars;
       if (!(nextIndex <= newTextStart || textIndex >= newTextEnd)) {
         func(Math.max(newTextStart, textIndex), Math.min(newTextEnd, nextIndex), op.attribs);
@@ -559,10 +555,8 @@ exports.restoreRevision = async (padID, rev) => {
 
   const changeset = builder.toString();
 
-  await Promise.all([
-    pad.appendRevision(changeset),
-    padMessageHandler.updatePadClients(pad),
-  ]);
+  await pad.appendRevision(changeset);
+  await padMessageHandler.updatePadClients(pad);
 };
 
 /**

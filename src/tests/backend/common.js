@@ -1,6 +1,8 @@
 'use strict';
 
+const AttributePool = require('../../static/js/AttributePool');
 const apiHandler = require('../../node/handler/APIHandler');
+const assert = require('assert').strict;
 const io = require('socket.io-client');
 const log4js = require('log4js');
 const process = require('process');
@@ -170,17 +172,84 @@ exports.connect = async (res = null) => {
  * @param {string} padId - Which pad to join.
  * @returns The CLIENT_VARS message from the server.
  */
-exports.handshake = async (socket, padId) => {
+exports.handshake = async (socket, padId, token = 't.12345') => {
   logger.debug('sending CLIENT_READY...');
   socket.send({
     component: 'pad',
     type: 'CLIENT_READY',
     padId,
     sessionID: null,
-    token: 't.12345',
+    token,
   });
   logger.debug('waiting for CLIENT_VARS response...');
   const msg = await exports.waitForSocketEvent(socket, 'message');
   logger.debug('received CLIENT_VARS message');
   return msg;
+};
+
+/**
+ * Convenience wrapper around `socket.send()` that waits for acknowledgement.
+ */
+exports.sendMessage = async (socket, message) => await new Promise((resolve, reject) => {
+  socket.send(message, (errInfo) => {
+    if (errInfo != null) {
+      const {name, message} = errInfo;
+      const err = new Error(message);
+      err.name = name;
+      reject(err);
+      return;
+    }
+    resolve();
+  });
+});
+
+/**
+ * Convenience function to send a USER_CHANGES message. Waits for acknowledgement.
+ */
+exports.sendUserChanges = async (socket, data) => await exports.sendMessage(socket, {
+  type: 'COLLABROOM',
+  component: 'pad',
+  data: {
+    type: 'USER_CHANGES',
+    apool: new AttributePool(),
+    ...data,
+  },
+});
+
+/**
+ * Convenience function that waits for an ACCEPT_COMMIT message. Asserts that the new revision
+ * matches the expected revision.
+ *
+ * Note: To avoid a race condition, this should be called before the USER_CHANGES message is sent.
+ * For example:
+ *
+ *     await Promise.all([
+ *       common.waitForAcceptCommit(socket, rev + 1),
+ *       common.sendUserChanges(socket, {baseRev: rev, changeset}),
+ *     ]);
+ */
+exports.waitForAcceptCommit = async (socket, wantRev) => {
+  const msg = await exports.waitForSocketEvent(socket, 'message');
+  assert.deepEqual(msg, {
+    type: 'COLLABROOM',
+    data: {
+      type: 'ACCEPT_COMMIT',
+      newRev: wantRev,
+    },
+  });
+};
+
+const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+
+/**
+ * Generates a random string.
+ *
+ * @param {number} [len] - The desired length of the generated string.
+ * @param {string} [charset] - Characters to pick from.
+ * @returns {string}
+ */
+exports.randomString = (len = 10, charset = `${alphabet}${alphabet.toUpperCase()}0123456789`) => {
+  let ret = '';
+  while (ret.length < len) ret += charset[Math.floor(Math.random() * charset.length)];
+  return ret;
 };
