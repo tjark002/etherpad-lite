@@ -18,13 +18,17 @@
   * `padOptions.showChat`
   * `padOptions.userColor`
   * `padOptions.userName`
-* Fixed the return value of the `getText` HTTP API when called with a specific
-  revision.
-* Fixed a potential attribute pool corruption bug with `copyPadWithoutHistory`.
-* Mappings created by the `createGroupIfNotExistsFor` HTTP API are now removed
-  from the database when the group is deleted.
-* Fixed race conditions in the `setText`, `appendText`, and `restoreRevision`
-  functions (HTTP API).
+* HTTP API:
+  * Fixed the return value of `getText` when called with a specific revision.
+  * Fixed a potential attribute pool corruption bug with
+    `copyPadWithoutHistory`.
+  * Mappings created by `createGroupIfNotExistsFor` are now removed from the
+    database when the group is deleted.
+  * Fixed race conditions in the `setText`, `appendText`, and `restoreRevision`
+    functions.
+  * Added an optional `authorId` parameter to `appendText`,
+    `copyPadWithoutHistory`, `createGroupPad`, `createPad`, `restoreRevision`,
+    `setHTML`, and `setText`, and bumped the latest API version to 1.3.0.
 * Fixed a crash if the database is busy enough to cause a query timeout.
 * New `/health` endpoint for getting information about Etherpad's health (see
   [draft-inadarei-api-health-check-06](https://www.ietf.org/archive/id/draft-inadarei-api-health-check-06.html)).
@@ -35,6 +39,7 @@
 #### For plugin authors
 
 * New `expressPreSession` server-side hook.
+* New `padDefaultContent` server-side hook.
 * New APIs for processing attributes: `ep_etherpad-lite/static/js/attributes`
   (low-level API) and `ep_etherpad-lite/static/js/AttributeMap` (high-level
   API).
@@ -44,6 +49,8 @@
   and whether the user only has read-only access.
 * The `handleMessageSecurity` server-side hook can now be used to grant write
   access for the current message only.
+* The `init_<pluginName>` server-side hooks have a new `logger` context
+  property that plugins can use to log messages.
 
 ### Compatibility changes
 
@@ -56,6 +63,8 @@
 * The `client` context property for the `handleMessageSecurity` and
   `handleMessage` server-side hooks is deprecated; use the `socket` context
   property instead.
+* The `author` context property for the `padCreate` and `padUpdate` server-side
+  hooks is deprecated; use the new `authorId` context property instead.
 * Returning `true` from a `handleMessageSecurity` hook function is deprecated;
   return `'permitOnce'` instead.
 * Changes to the `src/static/js/Changeset.js` library:
@@ -70,6 +79,22 @@
   * `appendATextToAssembler()`: Deprecated in favor of the new `opsFromAText()`
     generator function.
   * `newOp()`: Deprecated in favor of the new `Op` class.
+
+# 1.8.17
+
+Released: 2022-02-23
+
+### Security fixes
+
+* Fixed a vunlerability in the `CHANGESET_REQ` message handler that allowed a
+  user with any access to read any pad if the pad ID is known.
+
+### Notable enhancements and fixes
+
+* Fixed a bug that caused all pad edit messages received at the server to go
+  through a single queue. Now there is a separate queue per pad as intended,
+  which should reduce message processing latency when many pads are active at
+  the same time.
 
 # 1.8.16
 

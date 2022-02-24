@@ -241,6 +241,14 @@ exports.handleMessage = async (socket, message) => {
     thisSession.readonly =
         padIds.readonly || !webaccess.userCanModify(thisSession.auth.padID, socket.client.request);
   }
+  // Outside of the checks done by this function, message.padId must not be accessed because it is
+  // too easy to introduce a security vulnerability that allows malicious users to read or modify
+  // pads that they should not be able to access. Code should instead use
+  // sessioninfos[socket.id].padId if the real pad ID is needed or
+  // sessioninfos[socket.id].auth.padID if the original user-supplied pad ID is needed.
+  Object.defineProperty(message, 'padId', {get: () => {
+    throw new Error('message.padId must not be accessed (for security reasons)');
+  }});
 
   const auth = thisSession.auth;
   if (!auth) {
@@ -330,7 +338,7 @@ exports.handleMessage = async (socket, message) => {
       messageLogger.warn('Dropped message, COLLABROOM for readonly pad');
     } else if (message.data.type === 'USER_CHANGES') {
       stats.counter('pendingEdits').inc();
-      await padChannels.enqueue(message.padId, {socket, message});
+      await padChannels.enqueue(thisSession.padId, {socket, message});
     } else if (message.data.type === 'USERINFO_UPDATE') {
       await handleUserInfoUpdate(socket, message);
     } else if (message.data.type === 'CHAT_MESSAGE') {
@@ -676,13 +684,13 @@ const handleUserChanges = async (socket, message) => {
 
     const correctionChangeset = _correctMarkersInPad(pad.atext, pad.pool);
     if (correctionChangeset) {
-      await pad.appendRevision(correctionChangeset);
+      await pad.appendRevision(correctionChangeset, thisSession.author);
     }
 
     // Make sure the pad always ends with an empty line.
     if (pad.text().lastIndexOf('\n') !== pad.text().length - 1) {
       const nlChangeset = Changeset.makeSplice(pad.text(), pad.text().length - 1, 0, '\n');
-      await pad.appendRevision(nlChangeset);
+      await pad.appendRevision(nlChangeset, thisSession.author);
     }
 
     // The client assumes that ACCEPT_COMMIT and NEW_CHANGES messages arrive in order. Make sure we
@@ -1121,11 +1129,6 @@ const handleChangesetRequest = async (socket, message) => {
     return;
   }
 
-  if (message.padId == null) {
-    messageLogger.warn('Dropped message, changeset request has no padId!');
-    return;
-  }
-
   if (message.data.granularity == null) {
     messageLogger.warn('Dropped message, changeset request has no granularity!');
     return;
@@ -1151,16 +1154,16 @@ const handleChangesetRequest = async (socket, message) => {
   const start = message.data.start;
   const end = start + (100 * granularity);
 
-  const padIds = await readOnlyManager.getIds(message.padId);
+  const {padId} = sessioninfos[socket.id];
 
   // build the requested rough changesets and send them back
   try {
-    const data = await getChangesetInfo(padIds.padId, start, end, granularity);
+    const data = await getChangesetInfo(padId, start, end, granularity);
     data.requestID = message.data.requestID;
     socket.json.send({type: 'CHANGESET_REQ', data});
   } catch (err) {
     messageLogger.error(`Error while handling a changeset request ${message.data} ` +
-                        `for ${padIds.padId}: ${err.stack || err}`);
+                        `for ${padId}: ${err.stack || err}`);
   }
 };
 
@@ -1287,8 +1290,7 @@ const composePadChangesets = async (padId, startNum, endNum) => {
   const changesets = {};
   await Promise.all(changesetsNeeded.map(
       (revNum) => pad.getRevisionChangeset(revNum)
-          .then((changeset) => changesets[revNum] = changeset)
-  ));
+          .then((changeset) => changesets[revNum] = changeset)));
 
   // compose Changesets
   let r;

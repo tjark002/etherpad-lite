@@ -18,6 +18,7 @@ const CustomError = require('../utils/customError');
 const readOnlyManager = require('./ReadOnlyManager');
 const randomString = require('../utils/randomstring');
 const hooks = require('../../static/js/pluginfw/hooks');
+const {padutils: {warnDeprecated}} = require('../../static/js/pad_utils');
 const promises = require('../utils/promises');
 
 // serialization/deserialization attributes
@@ -76,11 +77,7 @@ Pad.prototype.getPublicStatus = function () {
   return this.publicStatus;
 };
 
-Pad.prototype.appendRevision = async function (aChangeset, author) {
-  if (!author) {
-    author = '';
-  }
-
+Pad.prototype.appendRevision = async function (aChangeset, authorId = '') {
   const newAText = Changeset.applyToAText(aChangeset, this.atext, this.pool);
   if (newAText.text === this.atext.text && newAText.attribs === this.atext.attribs) {
     return this.head;
@@ -92,13 +89,11 @@ Pad.prototype.appendRevision = async function (aChangeset, author) {
   const newRevData = {};
   newRevData.changeset = aChangeset;
   newRevData.meta = {};
-  newRevData.meta.author = author;
+  newRevData.meta.author = authorId;
   newRevData.meta.timestamp = Date.now();
 
   // ex. getNumForAuthor
-  if (author !== '') {
-    this.pool.putAttrib(['author', author]);
-  }
+  if (authorId !== '') this.pool.putAttrib(['author', authorId]);
 
   if (newRev % 100 === 0) {
     newRevData.meta.pool = this.pool;
@@ -111,15 +106,27 @@ Pad.prototype.appendRevision = async function (aChangeset, author) {
   ];
 
   // set the author to pad
-  if (author) {
-    p.push(authorManager.addPad(author, this.id));
-  }
+  if (authorId) p.push(authorManager.addPad(authorId, this.id));
 
-  if (this.head === 0) {
-    hooks.callAll('padCreate', {pad: this, author});
-  } else {
-    hooks.callAll('padUpdate', {pad: this, author, revs: newRev, changeset: aChangeset});
+  let hook = 'padCreate';
+  const context = {
+    pad: this,
+    authorId,
+    get author() {
+      warnDeprecated(`${hook} hook author context is deprecated; use authorId instead`);
+      return this.authorId;
+    },
+    set author(authorId) {
+      warnDeprecated(`${hook} hook author context is deprecated; use authorId instead`);
+      this.authorId = authorId;
+    },
+  };
+  if (this.head !== 0) {
+    hook = 'padUpdate';
+    context.revs = newRev;
+    context.changeset = aChangeset;
   }
+  hooks.callAll(hook, context);
 
   await Promise.all(p);
   return newRev;
@@ -162,15 +169,15 @@ Pad.prototype.getRevisionDate = async function (revNum) {
 };
 
 Pad.prototype.getAllAuthors = function () {
-  const authors = [];
+  const authorIds = [];
 
   for (const key in this.pool.numToAttrib) {
     if (this.pool.numToAttrib[key][0] === 'author' && this.pool.numToAttrib[key][1] !== '') {
-      authors.push(this.pool.numToAttrib[key][1]);
+      authorIds.push(this.pool.numToAttrib[key][1]);
     }
   }
 
-  return authors;
+  return authorIds;
 };
 
 Pad.prototype.getInternalRevisionAText = async function (targetRev) {
@@ -213,14 +220,14 @@ Pad.prototype.getRevision = async function (revNum) {
 };
 
 Pad.prototype.getAllAuthorColors = async function () {
-  const authors = this.getAllAuthors();
+  const authorIds = this.getAllAuthors();
   const returnTable = {};
   const colorPalette = authorManager.getColorPalette();
 
   await Promise.all(
-      authors.map((author) => authorManager.getAuthorColorId(author).then((colorId) => {
+      authorIds.map((authorId) => authorManager.getAuthorColorId(authorId).then((colorId) => {
         // colorId might be a hex color or an number out of the palette
-        returnTable[author] = colorPalette[colorId] || colorId;
+        returnTable[authorId] = colorPalette[colorId] || colorId;
       })));
 
   return returnTable;
@@ -267,8 +274,9 @@ Pad.prototype.text = function () {
  * @param {number} ndel - Number of characters to remove starting at `start`. Must be a non-negative
  *     integer less than or equal to `this.text().length - start`.
  * @param {string} ins - New text to insert at `start` (after the `ndel` characters are deleted).
+ * @param {string} [authorId] - Author ID of the user making the change (if applicable).
  */
-Pad.prototype.spliceText = async function (start, ndel, ins) {
+Pad.prototype.spliceText = async function (start, ndel, ins, authorId = '') {
   if (start < 0) throw new RangeError(`start index must be non-negative (is ${start})`);
   if (ndel < 0) throw new RangeError(`characters to delete must be non-negative (is ${ndel})`);
   const orig = this.text();
@@ -282,7 +290,7 @@ Pad.prototype.spliceText = async function (start, ndel, ins) {
   if (!willEndWithNewline) ins += '\n';
   if (ndel === 0 && ins.length === 0) return;
   const changeset = Changeset.makeSplice(orig, start, ndel, ins);
-  await this.appendRevision(changeset);
+  await this.appendRevision(changeset, authorId);
 };
 
 /**
@@ -290,18 +298,20 @@ Pad.prototype.spliceText = async function (start, ndel, ins) {
  *
  * @param {string} newText - The pad's new text. If this string does not end with a newline, one
  *     will be automatically appended.
+ * @param {string} [authorId] - The author ID of the user that initiated the change, if applicable.
  */
-Pad.prototype.setText = async function (newText) {
-  await this.spliceText(0, this.text().length, newText);
+Pad.prototype.setText = async function (newText, authorId = '') {
+  await this.spliceText(0, this.text().length, newText, authorId);
 };
 
 /**
  * Appends text to the pad.
  *
  * @param {string} newText - Text to insert just BEFORE the pad's existing terminating newline.
+ * @param {string} [authorId] - The author ID of the user that initiated the change, if applicable.
  */
-Pad.prototype.appendText = async function (newText) {
-  await this.spliceText(this.text().length - 1, 0, newText);
+Pad.prototype.appendText = async function (newText, authorId = '') {
+  await this.spliceText(this.text().length - 1, 0, newText, authorId);
 };
 
 /**
@@ -361,12 +371,7 @@ Pad.prototype.getChatMessages = async function (start, end) {
   });
 };
 
-Pad.prototype.init = async function (text) {
-  // replace text with default text if text isn't set
-  if (text == null) {
-    text = settings.defaultPadText;
-  }
-
+Pad.prototype.init = async function (text, authorId = '') {
   // try to load the pad
   const value = await this._db.get(`pad:${this.id}`);
 
@@ -381,10 +386,19 @@ Pad.prototype.init = async function (text) {
       }
     }
   } else {
-    // this pad doesn't exist, so create it
-    const firstChangeset = Changeset.makeSplice('\n', 0, 0, exports.cleanText(text));
-
-    await this.appendRevision(firstChangeset, '');
+    if (text == null) {
+      const context = {
+        pad: this,
+        authorId,
+        type: 'text',
+        content: exports.cleanText(settings.defaultPadText),
+      };
+      await hooks.aCallAll('padDefaultContent', context);
+      if (context.type !== 'text') throw new Error(`unsupported content type: ${context.type}`);
+      text = context.content;
+    }
+    const firstChangeset = Changeset.makeSplice('\n', 0, 0, text);
+    await this.appendRevision(firstChangeset, authorId);
   }
 };
 
@@ -469,9 +483,7 @@ Pad.prototype.copyAuthorInfoToDestinationPad = async function (destinationID) {
       (authorID) => authorManager.addPad(authorID, destinationID)));
 };
 
-Pad.prototype.copyPadWithoutHistory = async function (destinationID, force) {
-  const sourceID = this.id;
-
+Pad.prototype.copyPadWithoutHistory = async function (destinationID, force, authorId = '') {
   // flush the source pad
   this.saveToDatabase();
 
@@ -481,9 +493,6 @@ Pad.prototype.copyPadWithoutHistory = async function (destinationID, force) {
   // if force is true and already exists a Pad with the same id, remove that Pad
   await this.removePadIfForceIsTrueAndAlreadyExist(destinationID, force);
 
-  const sourcePad = await padManager.getPad(sourceID);
-
-  // add the new sourcePad to all authors who contributed to the old one
   await this.copyAuthorInfoToDestinationPad(destinationID);
 
   // Group pad? Add it to the group's list
@@ -492,8 +501,8 @@ Pad.prototype.copyPadWithoutHistory = async function (destinationID, force) {
   }
 
   // initialize the pad with a new line to avoid getting the defaultText
-  const newPad = await padManager.getPad(destinationID, '\n');
-  newPad.pool = sourcePad.pool.clone();
+  const newPad = await padManager.getPad(destinationID, '\n', authorId);
+  newPad.pool = this.pool.clone();
 
   const oldAText = this.atext;
 
@@ -512,7 +521,7 @@ Pad.prototype.copyPadWithoutHistory = async function (destinationID, force) {
   // create a changeset that removes the previous text and add the newText with
   // all atributes present on the source pad
   const changeset = Changeset.pack(oldLength, newLength, assem.toString(), newText);
-  newPad.appendRevision(changeset);
+  newPad.appendRevision(changeset, authorId);
 
   await hooks.aCallAll('padCopy', {originalPad: this, destinationID});
 
@@ -562,8 +571,8 @@ Pad.prototype.remove = async function () {
   }));
 
   // remove pad from all authors who contributed
-  this.getAllAuthors().forEach((authorID) => {
-    p.push(authorManager.removePad(authorID, padID));
+  this.getAllAuthors().forEach((authorId) => {
+    p.push(authorManager.removePad(authorId, padID));
   });
 
   // delete the pad entry and delete pad from padManager
@@ -643,22 +652,22 @@ Pad.prototype.check = async function () {
   assert(pool instanceof AttributePool);
   await pool.check();
 
-  const authors = new Set();
+  const authorIds = new Set();
   pool.eachAttrib((k, v) => {
-    if (k === 'author' && v) authors.add(v);
+    if (k === 'author' && v) authorIds.add(v);
   });
   let atext = Changeset.makeAText('\n');
   let r;
   try {
     for (r = 0; r <= head; ++r) {
-      const [changeset, author, timestamp] = await Promise.all([
+      const [changeset, authorId, timestamp] = await Promise.all([
         this.getRevisionChangeset(r),
         this.getRevisionAuthor(r),
         this.getRevisionDate(r),
       ]);
-      assert(author != null);
-      assert.equal(typeof author, 'string');
-      if (author) authors.add(author);
+      assert(authorId != null);
+      assert.equal(typeof authorId, 'string');
+      if (authorId) authorIds.add(authorId);
       assert(timestamp != null);
       assert.equal(typeof timestamp, 'number');
       assert(timestamp > 0);
@@ -689,7 +698,7 @@ Pad.prototype.check = async function () {
   }
   assert.equal(this.text(), atext.text);
   assert.deepEqual(this.atext, atext);
-  assert.deepEqual(this.getAllAuthors().sort(), [...authors].sort());
+  assert.deepEqual(this.getAllAuthors().sort(), [...authorIds].sort());
 
   assert(Number.isInteger(this.chatHead));
   assert(this.chatHead >= -1);

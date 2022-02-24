@@ -56,7 +56,10 @@ Called from: `src/static/js/pluginfw/plugins.js`
 
 Run during startup after the named plugin is initialized.
 
-Context properties: None
+Context properties:
+
+  * `logger`: An object with the following `console`-like methods: `debug`,
+    `info`, `log`, `warn`, `error`.
 
 ## `expressPreSession`
 
@@ -204,15 +207,42 @@ Things in context:
 This hook gets called when the access to the concrete pad is being checked.
 Return `false` to deny access.
 
-## padCreate
-Called from: src/node/db/Pad.js
+## `padCreate`
 
-Things in context:
+Called from: `src/node/db/Pad.js`
 
-1. pad - the pad instance
-2. author - the id of the author who created the pad
+Called when a new pad is created.
 
-This hook gets called when a new pad was created.
+Context properties:
+
+* `pad`: The Pad object.
+* `authorId`: The ID of the author who created the pad.
+* `author` (**deprecated**): Synonym of `authorId`.
+
+## `padDefaultContent`
+
+Called from `src/node/db/Pad.js`
+
+Called to obtain a pad's initial content, unless the pad is being created with
+specific content. The return value is ignored; to change the content, modify the
+`content` context property.
+
+This hook is run asynchronously. All registered hook functions are run
+concurrently (via `Promise.all()`), so be careful to avoid race conditions when
+reading and modifying the context properties.
+
+Context properties:
+
+* `pad`: The newly created Pad object.
+* `authorId`: The author ID of the user that is creating the pad.
+* `type`: String identifying the content type. Currently this is `'text'` and
+  must not be changed. Future versions of Etherpad may add support for HTML,
+  jsdom objects, or other formats, so plugins must assert that this matches a
+  supported content type before reading `content`.
+* `content`: The pad's initial content. Change this property to change the pad's
+  initial content. If the content type is changed, the `type` property must also
+  be updated to match. Plugins must check the value of the `type` property
+  before reading this value.
 
 ## `padLoad`
 
@@ -224,17 +254,20 @@ Context properties:
 
 * `pad`: The Pad object.
 
-## padUpdate
-Called from: src/node/db/Pad.js
+## `padUpdate`
 
-Things in context:
+Called from: `src/node/db/Pad.js`
 
-1. pad - the pad instance
-2. author - the id of the author who updated the pad
-3. revs - the index of the new revision
-4. changeset - the changeset of this revision (see [Changeset Library](#index_changeset_library))
+Called when an existing pad is updated.
 
-This hook gets called when an existing pad was updated.
+Context properties:
+
+* `pad`: The Pad object.
+* `authorId`: The ID of the author who updated the pad.
+* `author` (**deprecated**): Synonym of `authorId`.
+* `revs`: The index of the new revision.
+* `changeset`: The changeset of this revision (see [Changeset
+  Library](#index_changeset_library)).
 
 ## padCopy
 Called from: src/node/db/Pad.js

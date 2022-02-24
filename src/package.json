@@ -78,15 +78,8 @@
     "etherpad-lite": "node/server.js"
   },
   "devDependencies": {
-    "eslint": "^8.8.0",
-    "eslint-config-etherpad": "^2.0.7",
-    "eslint-plugin-cypress": "^2.12.1",
-    "eslint-plugin-eslint-comments": "^3.2.0",
-    "eslint-plugin-mocha": "^10.0.3",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-prefer-arrow": "^1.2.3",
-    "eslint-plugin-promise": "^6.0.0",
-    "eslint-plugin-you-dont-need-lodash-underscore": "^6.12.0",
+    "eslint": "^8.9.0",
+    "eslint-config-etherpad": "^3.0.1",
     "etherpad-cli-client": "^0.1.12",
     "mocha": "^9.1.3",
     "mocha-froth": "^0.2.10",
@@ -96,143 +89,8 @@
     "set-cookie-parser": "^2.4.8",
     "sinon": "^12.0.1",
     "split-grid": "^1.0.11",
-    "supertest": "^6.1.6"
-  },
-  "eslintConfig": {
-    "ignorePatterns": [
-      "/static/js/admin/jquery.autosize.js",
-      "/static/js/admin/minify.json.js",
-      "/static/js/vendors/browser.js",
-      "/static/js/vendors/farbtastic.js",
-      "/static/js/vendors/gritter.js",
-      "/static/js/vendors/html10n.js",
-      "/static/js/vendors/jquery.js",
-      "/static/js/vendors/nice-select.js",
-      "/tests/frontend/lib/"
-    ],
-    "overrides": [
-      {
-        "files": [
-          "**/.eslintrc.js"
-        ],
-        "extends": "etherpad/node"
-      },
-      {
-        "files": [
-          "**/*"
-        ],
-        "excludedFiles": [
-          "**/.eslintrc.js",
-          "tests/frontend/**/*"
-        ],
-        "extends": "etherpad/node"
-      },
-      {
-        "files": [
-          "static/**/*",
-          "tests/frontend/helper.js",
-          "tests/frontend/helper/**/*"
-        ],
-        "excludedFiles": [
-          "**/.eslintrc.js"
-        ],
-        "extends": "etherpad/browser",
-        "env": {
-          "shared-node-browser": true
-        },
-        "overrides": [
-          {
-            "files": [
-              "tests/frontend/helper/**/*"
-            ],
-            "globals": {
-              "helper": "readonly"
-            }
-          }
-        ]
-      },
-      {
-        "files": [
-          "tests/**/*"
-        ],
-        "excludedFiles": [
-          "**/.eslintrc.js",
-          "tests/frontend/cypress/**/*",
-          "tests/frontend/helper.js",
-          "tests/frontend/helper/**/*",
-          "tests/frontend/travis/**/*",
-          "tests/ratelimit/**/*"
-        ],
-        "extends": "etherpad/tests",
-        "rules": {
-          "mocha/no-exports": "off",
-          "mocha/no-top-level-hooks": "off"
-        }
-      },
-      {
-        "files": [
-          "tests/backend/**/*"
-        ],
-        "excludedFiles": [
-          "**/.eslintrc.js"
-        ],
-        "extends": "etherpad/tests/backend",
-        "overrides": [
-          {
-            "files": [
-              "tests/backend/**/*"
-            ],
-            "excludedFiles": [
-              "tests/backend/specs/**/*"
-            ],
-            "rules": {
-              "mocha/no-exports": "off",
-              "mocha/no-top-level-hooks": "off"
-            }
-          }
-        ]
-      },
-      {
-        "files": [
-          "tests/frontend/**/*"
-        ],
-        "excludedFiles": [
-          "**/.eslintrc.js",
-          "tests/frontend/cypress/**/*",
-          "tests/frontend/helper.js",
-          "tests/frontend/helper/**/*",
-          "tests/frontend/travis/**/*"
-        ],
-        "extends": "etherpad/tests/frontend",
-        "overrides": [
-          {
-            "files": [
-              "tests/frontend/**/*"
-            ],
-            "excludedFiles": [
-              "tests/frontend/specs/**/*"
-            ],
-            "rules": {
-              "mocha/no-exports": "off",
-              "mocha/no-top-level-hooks": "off"
-            }
-          }
-        ]
-      },
-      {
-        "files": [
-          "tests/frontend/cypress/**/*"
-        ],
-        "extends": "etherpad/tests/cypress"
-      },
-      {
-        "files": [
-          "tests/frontend/travis/**/*"
-        ],
-        "extends": "etherpad/node"
-      }
-    ],
-    "root": true
+    "supertest": "^6.1.6",
+    "typescript": "^4.5.5"
   },
   "engines": {
     "node": ">=12.17.0",
