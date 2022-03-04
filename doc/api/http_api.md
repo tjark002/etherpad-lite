@@ -180,8 +180,8 @@ returns all pads of this group
 creates a new pad in this group
 
 *Example returns:*
-  * `{code: 0, message:"ok", data: null}`
-  * `{code: 1, message:"pad does already exist", data: null}`
+  * `{code: 0, message:"ok", data: {padID: "g.s8oes9dhwrvt0zif$test"}`
+  * `{code: 1, message:"padName does already exist", data: null}`
   * `{code: 1, message:"groupID does not exist", data: null}`
 
 #### listAllGroups()
@@ -566,11 +566,12 @@ returns the id of a pad which is assigned to the readOnlyID
 #### setPublicStatus(padID, publicStatus)
  * API >= 1
 
-sets a boolean for the public status of a pad
+sets a boolean for the public status of a group pad
 
 *Example returns:*
   * `{code: 0, message:"ok", data: null}`
   * `{code: 1, message:"padID does not exist", data: null}`
+  * `{code: 1, message:"You can only get/set the publicStatus of pads that belong to a group", data: null}`
 
 #### getPublicStatus(padID)
  * API >= 1
@@ -580,6 +581,7 @@ return true of false
 *Example returns:*
   * `{code: 0, message:"ok", data: {publicStatus: true}}`
   * `{code: 1, message:"padID does not exist", data: null}`
+  * `{code: 1, message:"You can only get/set the publicStatus of pads that belong to a group", data: null}`
 
 #### listAuthorsOfPad(padID)
  * API >= 1

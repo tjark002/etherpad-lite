@@ -93,20 +93,36 @@ const padutils = {
    * Prints a warning message followed by a stack trace (to make it easier to figure out what code
    * is using the deprecated function).
    *
+   * Identical deprecation warnings (as determined by the stack trace, if available) are rate
+   * limited to avoid log spam.
+   *
    * Most browsers include UI widget to examine the stack at the time of the warning, but this
    * includes the stack in the log message for a couple of reasons:
    *   - This makes it possible to see the stack if the code runs in Node.js.
    *   - Users are more likely to paste the stack in bug reports they might file.
    *
-   * @param {...*} args - Passed to `console.warn`, with a stack trace appended.
+   * @param {...*} args - Passed to `padutils.warnDeprecated.logger.warn` (or `console.warn` if no
+   *     logger is set), with a stack trace appended if available.
    */
   warnDeprecated: (...args) => {
     if (padutils.warnDeprecated.disabledForTestingOnly) return;
     const err = new Error();
     if (Error.captureStackTrace) Error.captureStackTrace(err, padutils.warnDeprecated);
     err.name = '';
+    // Rate limit identical deprecation warnings (as determined by the stack) to avoid log spam.
+    if (typeof err.stack === 'string') {
+      if (padutils.warnDeprecated._rl == null) {
+        padutils.warnDeprecated._rl =
+            {prevs: new Map(), now: () => Date.now(), period: 10 * 60 * 1000};
+      }
+      const rl = padutils.warnDeprecated._rl;
+      const now = rl.now();
+      const prev = rl.prevs.get(err.stack);
+      if (prev != null && now - prev < rl.period) return;
+      rl.prevs.set(err.stack, now);
+    }
     if (err.stack) args.push(err.stack);
-    console.warn(...args);
+    (padutils.warnDeprecated.logger || console).warn(...args);
   },
 
   escapeHtml: (x) => Security.escapeHTML(String(x)),
