@@ -204,15 +204,10 @@
               </svg>
                <% if (!settings.requireSession) { %>
                     <% if (settings.editOnly) { %>
-                        <label id="label" for="padname" data-l10n-id="index.openPad"></label>
                     <% } else {%>
                         <button id="button" data-l10n-id="index.newPad"></button>
-                        <label id="label" for="padname" data-l10n-id="index.createOpenPad"></label>
+                        <span>Mit unserem kitsPad kannst du kollaborativ Texte in Echtzeit erarbeiten, kommentieren und die Ergebnisse exportieren. Änderungen sind dabei immer transparent.</span>
                     <% } %>
-                    <form action="#" id="go2Name">
-                        <input type="text" id="padname" maxlength="50" autofocus x-webkit-speech>
-                        <button type="submit">OK</button>
-                    </form>
                 <% } %>
             </div>
         <% e.end_block(); %>
