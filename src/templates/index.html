@@ -205,7 +205,9 @@
                <% if (!settings.requireSession) { %>
                     <% if (settings.editOnly) { %>
                     <% } else {%>
-                        <span style="color:black !important">Mit unserem kitsPad kannst du kollaborativ Texte in Echtzeit erarbeiten, kommentieren und die Ergebnisse exportieren. Änderungen sind dabei immer transparent.</span>
+                      <div id="visionz_welcome_wrapper">
+                        <span id="visionz_welcome_text" style="color:black !important; text-align: center;">Mit unserem kitsPad kannst du kollaborativ Texte in Echtzeit erarbeiten, kommentieren und die Ergebnisse exportieren. Änderungen sind dabei immer transparent.</span>
+                      </div> 
                         <button id="button" data-l10n-id="index.newPad"></button>
                     <% } %>
                 <% } %>
@@ -213,6 +215,16 @@
         <% e.end_block(); %>
             <!-- kits footer start -->
             <style>
+            #visionz_welcome_wrapper{
+              padding-bottom: 30px;
+            }
+            
+            #visionz_welcome_text {
+              color:black !important;
+              text-align: center;
+            }
+
+
             .kits_footer {
                 font-family: Arial, Helvetica, sans-serif;
                 background: #ffffff;
