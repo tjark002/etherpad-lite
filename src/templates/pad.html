@@ -320,7 +320,7 @@
           <% e.begin_block("embedPopup"); %>
           <h1 data-l10n-id="pad.share"></h1>
           <div id="embedreadonly" class="acl-write">
-              <input type="checkbox" id="readonlyinput" onchange="generate_qrcode()">
+              <input type="checkbox" id="readonlyinput" onchange="update_qrcode()">
               <label for="readonlyinput" data-l10n-id="pad.share.readonly"></label>
           </div>
           <div id="linkcode">
@@ -335,15 +335,8 @@
               <h2>Dein QR-Code</h2>
           </div>
             <script type="text/javascript">
-              console.log("test1 ",qrlink);
-              function generate_qrcode() {
-                let qrlink = window.location.href;
-                //let qrlink = document.getElementById("linkinput").value;
-                console.log("test2 ",qrlink);
-                new QRCode(document.getElementById("qrcode"), qrlink);
-              }
-              console.log("test3 ",qrlink);
-              generate_qrcode();
+              let qrlinky = window.location.href
+              new QRCode(document.getElementById("qrcode"), qrlinky);
             </script>
             <button onmousedown="download()">QR-Code herunterladen</button>
           <% e.end_block(); %>

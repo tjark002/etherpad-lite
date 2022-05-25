@@ -5,3 +5,19 @@ function download(){
     link.href = thisImg.src //Gives the data to the link
     link.click(); //Clicks the 'a' element we created
 }
+
+function update_qrcode() {
+    delete_qrcode();
+    generate_qrcode();
+}
+
+function delete_qrcode() {
+    document.getElementById('qrcode').getElementsByTagName('img')[0].remove();
+    document.getElementById('qrcode').getElementsByTagName('canvas')[0].remove();
+}
+
+function generate_qrcode() {
+    let qrlink = document.getElementById("linkinput").value;
+    new QRCode(document.getElementById("qrcode"), qrlink);
+    
+}
