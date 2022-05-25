@@ -1,3 +1,5 @@
+
+
 /**
  * @fileoverview
  * - Using the 'QRCode for Javascript library'
@@ -8,6 +10,8 @@
  * @see <a href="http://www.d-project.com/" target="_blank">http://www.d-project.com/</a>
  * @see <a href="http://jeromeetienne.github.com/jquery-qrcode/" target="_blank">http://jeromeetienne.github.com/jquery-qrcode/</a>
  */
+
+
  var QRCode;
 
  (function () {
@@ -22,7 +26,7 @@
      //   http://www.opensource.org/licenses/mit-license.php
      //
      // The word "QR Code" is registered trademark of 
-     // DENSO WAVE INCORPORATED
+     // DENSO WAVE INCORPORATED 
      //   http://www.denso-wave.com/qrcode/faqpatent-e.html
      //
      //---------------------------------------------------------------------
